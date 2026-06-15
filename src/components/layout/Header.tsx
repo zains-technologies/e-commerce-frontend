@@ -42,7 +42,7 @@ export function Header() {
             <div key={item.slug} className="group relative">
               <Link
                 href={`/products?category=${item.slug}`}
-                className="inline-flex items-center gap-1 text-sm font-black tracking-tight text-neutral-700 hover:text-black"
+                className="inline-flex items-center gap-1 text-sm font-medium text-neutral-700 transition-colors hover:text-black"
               >
                 {item.title}
                 {item.children?.length ? <ChevronDown /> : null}
@@ -75,7 +75,7 @@ export function Header() {
 
 function HeaderLink({ href, active, children }: { href: string; active?: boolean; children: ReactNode }) {
   return (
-    <Link href={href} className={cn("text-sm font-black tracking-tight hover:text-black", active ? "text-black" : "text-neutral-700")}>
+    <Link href={href} className={cn("text-sm font-medium transition-colors hover:text-black", active ? "text-black" : "text-neutral-700")}>
       {children}
     </Link>
   );
@@ -96,7 +96,7 @@ function CategoryDropdownItems({ items, depth = 0 }: { items: NavigationItem[]; 
         <div key={item.slug}>
           <Link
             href={`/products?category=${item.slug}`}
-            className="block rounded-2xl py-3 pr-4 text-xs font-bold text-neutral-600 hover:bg-neutral-100 hover:text-black"
+            className="block rounded-2xl py-3 pr-4 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black"
             style={{ paddingLeft: `${16 + depth * 14}px` }}
           >
             {depth > 0 ? "↳ " : ""}{item.title}

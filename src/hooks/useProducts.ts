@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { productService } from "@/services/productService";
+import type { Category } from "@/types/category";
 import type { Product } from "@/types/product";
 
 const fallbackProducts: Product[] = [
@@ -73,13 +74,24 @@ export function useProducts() {
   return { products, loading, error };
 }
 
-export function useProductFilters(products: Product[], search: string, category: string, sort: string) {
+export function useProductFilters(
+  products: Product[],
+  search: string,
+  category: string,
+  sort: string,
+  categories: Category[] = [],
+  extraFilters: { tag?: string; collection?: string } = {},
+) {
   return useMemo(() => {
     const query = search.trim().toLowerCase();
+    const selectedCategory = categories.find((item) => item.slug === category);
+    const categorySlugs = new Set([category, ...collectDescendantSlugs(selectedCategory, categories)]);
     let result = products.filter((product) => {
       const matchesSearch = !query || product.name.toLowerCase().includes(query);
-      const matchesCategory = category === "all" || product.category?.slug === category;
-      return matchesSearch && matchesCategory;
+      const matchesCategory = category === "all" || Boolean(product.category?.slug && categorySlugs.has(product.category.slug));
+      const matchesTag = !extraFilters.tag || Boolean(product.tags?.some((tag) => tag.slug === extraFilters.tag));
+      const matchesCollection = !extraFilters.collection || Boolean(product.collections?.some((collection) => collection.slug === extraFilters.collection));
+      return matchesSearch && matchesCategory && matchesTag && matchesCollection;
     });
 
     if (sort === "price-low") result = [...result].sort((a, b) => a.price - b.price);
@@ -87,6 +99,14 @@ export function useProductFilters(products: Product[], search: string, category:
     if (sort === "featured") result = [...result].sort((a, b) => Number(b.is_featured) - Number(a.is_featured));
 
     return result;
-  }, [products, search, category, sort]);
+  }, [products, search, category, sort, categories, extraFilters.tag, extraFilters.collection]);
 }
 
+function collectDescendantSlugs(category: Category | undefined, categories: Category[]): string[] {
+  if (!category) return [];
+  const nestedChildren = category.children || [];
+  const flatChildren = categories.filter((item) => item.parent_id === category.id);
+  const children = Array.from(new Map([...nestedChildren, ...flatChildren].map((child) => [child.id, child])).values());
+
+  return children.flatMap((child) => [child.slug, ...collectDescendantSlugs(child, categories)]);
+}

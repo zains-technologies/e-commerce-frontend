@@ -4,8 +4,7 @@ import type { Category } from "@/types/category";
 
 export const categoryService = {
   async list() {
-    const response = await apiRequest<PaginatedResponse<Category>>(API_ROUTES.CATEGORIES);
+    const response = await apiRequest<PaginatedResponse<Category>>(`${API_ROUTES.CATEGORIES}?per_page=500`);
     return response.data;
   },
 };
-

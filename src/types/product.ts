@@ -11,17 +11,71 @@ export interface ProductVariant {
   id: number;
   attribute_name: string;
   attribute_value: string;
+  options?: Record<string, string> | null;
   price_adjustment: number;
   stock_quantity: number;
   sku?: string | null;
 }
 
-export interface Product {
+export interface CatalogBrand {
   id: number;
-  category?: Category | null;
   name: string;
   slug: string;
   description?: string | null;
+  logo_path?: string | null;
+  is_active?: boolean;
+}
+
+export interface CatalogTag {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface ProductCollection {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export interface SizeGuide {
+  id: number;
+  name: string;
+  rows?: Array<Record<string, string>> | null;
+  notes?: string | null;
+  is_active?: boolean;
+}
+
+export interface ProductSpecification {
+  id?: number;
+  name: string;
+  value?: string | null;
+}
+
+export interface ProductReview {
+  id: number;
+  customer_name: string;
+  rating: number;
+  comment?: string | null;
+  status?: string;
+  created_at?: string;
+}
+
+export interface Product {
+  id: number;
+  category?: Category | null;
+  brand?: CatalogBrand | null;
+  name: string;
+  slug: string;
+  description?: string | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+    keywords?: string | null;
+  };
   price: number;
   cost_price?: number;
   sku?: string | null;
@@ -31,5 +85,14 @@ export interface Product {
   is_featured?: boolean;
   images?: ProductImage[];
   variants?: ProductVariant[];
+  tags?: CatalogTag[];
+  collections?: ProductCollection[];
+  size_guide?: SizeGuide | null;
+  specifications?: ProductSpecification[];
+  reviews_summary?: {
+    average_rating: number;
+    count: number;
+  };
+  reviews?: ProductReview[];
+  related_products?: Array<{ id: number; name: string; slug: string; price: number; image?: string | null }>;
 }
-

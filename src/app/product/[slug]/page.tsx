@@ -62,7 +62,13 @@ export default function ProductDetailPage() {
               </div>
               <div className="md:pt-6">
                 <Link href="/products" className="text-xs font-bold uppercase text-neutral-500">← Back to products</Link>
+                {product.brand?.name && <p className="mt-6 text-xs font-bold uppercase text-neutral-500">{product.brand.name}</p>}
                 <h1 className="mt-6 text-5xl font-medium leading-[0.95] tracking-[-0.07em] md:text-7xl">{product.name}</h1>
+                {product.reviews_summary?.count ? (
+                  <p className="mt-4 text-sm font-bold">
+                    ★ {product.reviews_summary.average_rating} / 5 · {product.reviews_summary.count} reviews
+                  </p>
+                ) : null}
                 <p className="mt-5 text-2xl font-bold">{formatCurrency(price)}</p>
                 <p className="mt-5 max-w-xl text-sm leading-6 text-neutral-600">{product.description}</p>
                 <div className="mt-8 space-y-4">
@@ -79,6 +85,25 @@ export default function ProductDetailPage() {
                     ))}
                   </div>
                 </div>
+                {product.size_guide && (
+                  <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
+                    <p className="text-xs font-bold uppercase text-neutral-500">{product.size_guide.name}</p>
+                    {product.size_guide.notes && <p className="mt-2 text-sm text-neutral-600">{product.size_guide.notes}</p>}
+                  </div>
+                )}
+                {product.specifications?.length ? (
+                  <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
+                    <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Specifications</p>
+                    <div className="grid gap-2 text-sm">
+                      {product.specifications.map((specification) => (
+                        <div key={specification.name} className="flex justify-between gap-4 border-b border-neutral-100 pb-2 last:border-b-0">
+                          <span className="text-neutral-500">{specification.name}</span>
+                          <strong className="text-right">{specification.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mt-8 flex items-center gap-3">
                   <div className="inline-flex h-12 items-center rounded-full border border-neutral-200">
                     <button className="size-12" onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
@@ -93,8 +118,28 @@ export default function ProductDetailPage() {
             </div>
             <div className="mt-14">
               <h2 className="mb-5 text-3xl font-medium tracking-[-0.04em]">Related products</h2>
-              <ProductGrid products={products.filter((item) => item.slug !== product.slug).slice(0, 4)} />
+              <ProductGrid products={product.related_products?.length ? product.related_products.map((item) => ({
+                id: item.id,
+                name: item.name,
+                slug: item.slug,
+                price: item.price,
+                stock_quantity: 0,
+                images: item.image ? [{ id: item.id, url: item.image }] : [],
+              })) : products.filter((item) => item.slug !== product.slug).slice(0, 4)} />
             </div>
+            {product.reviews?.length ? (
+              <div className="mt-14">
+                <h2 className="mb-5 text-3xl font-medium tracking-[-0.04em]">Customer reviews</h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {product.reviews.map((review) => (
+                    <div key={review.id} className="rounded-[24px] border border-neutral-200 p-5">
+                      <p className="font-bold">★ {review.rating} · {review.customer_name}</p>
+                      <p className="mt-3 text-sm leading-6 text-neutral-600">{review.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </section>

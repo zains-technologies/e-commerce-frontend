@@ -17,6 +17,10 @@ const emptyData: AdminDashboardData = {
   inventoryLogs: [],
   branches: [],
   staff: [],
+  brands: [],
+  tags: [],
+  collections: [],
+  sizeGuides: [],
 };
 
 let cachedAdminUser: User | null = null;
@@ -54,8 +58,15 @@ export function useAdmin(section: AdminSection = "overview") {
       }
 
       if (section === "products") {
-        const [products, categories] = await Promise.all([adminService.products(), adminService.categories()]);
-        Object.assign(nextData, { products, categories });
+        const [products, categories, brands, tags, collections, sizeGuides] = await Promise.all([
+          adminService.products(),
+          adminService.categories(),
+          adminService.brands().catch(() => []),
+          adminService.tags().catch(() => []),
+          adminService.collections().catch(() => []),
+          adminService.sizeGuides().catch(() => []),
+        ]);
+        Object.assign(nextData, { products, categories, brands, tags, collections, sizeGuides });
         loadedProducts = products;
       }
 

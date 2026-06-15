@@ -1,7 +1,8 @@
 import { API_ROUTES } from "@/constants/apiRoutes";
-import { apiRequest, type PaginatedResponse, type SingleResponse } from "./api";
+import { getToken } from "@/lib/utils";
+import { API_BASE_URL, apiRequest, type PaginatedResponse, type SingleResponse } from "./api";
 import type { Category } from "@/types/category";
-import type { Product } from "@/types/product";
+import type { CatalogBrand, CatalogTag, Product, ProductCollection, SizeGuide } from "@/types/product";
 import type {
   Branch,
   Coupon,
@@ -20,9 +21,31 @@ function bodyFor(payload: AdminPayload) {
   return payload instanceof FormData ? payload : JSON.stringify(payload);
 }
 
+async function listWithFallback<T>(primaryPath: string, fallbackPath: string) {
+  try {
+    const response = await apiRequest<SingleResponse<T[]> | { success: boolean; data: T[] }>(primaryPath);
+    return response.data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.toLowerCase().includes("route") && !message.includes("404")) {
+      throw error;
+    }
+    try {
+      const response = await apiRequest<SingleResponse<T[]> | { success: boolean; data: T[] }>(fallbackPath, { auth: true });
+      return response.data;
+    } catch {
+      return [];
+    }
+  }
+}
+
 export const adminService = {
   products: () => apiRequest<PaginatedResponse<Product>>(API_ROUTES.PRODUCTS, { auth: true }).then((r) => r.data),
   categories: () => apiRequest<PaginatedResponse<Category>>(API_ROUTES.CATEGORIES, { auth: true }).then((r) => r.data),
+  brands: () => listWithFallback<CatalogBrand>(API_ROUTES.BRANDS, API_ROUTES.ADMIN_BRANDS),
+  tags: () => listWithFallback<CatalogTag>(API_ROUTES.TAGS, API_ROUTES.ADMIN_TAGS),
+  collections: () => listWithFallback<ProductCollection>(API_ROUTES.COLLECTIONS, API_ROUTES.ADMIN_COLLECTIONS),
+  sizeGuides: () => listWithFallback<SizeGuide>(API_ROUTES.SIZE_GUIDES, API_ROUTES.ADMIN_SIZE_GUIDES),
   orders: () => apiRequest<PaginatedResponse<Order>>(API_ROUTES.ORDERS, { auth: true }).then((r) => r.data),
   coupons: () => apiRequest<PaginatedResponse<Coupon>>(API_ROUTES.ADMIN_COUPONS, { auth: true }).then((r) => r.data),
   payments: () => apiRequest<PaginatedResponse<Payment>>(API_ROUTES.ADMIN_PAYMENTS, { auth: true }).then((r) => r.data),
@@ -76,11 +99,96 @@ export const adminService = {
     });
   },
 
+  restockProduct(productId: number, payload: { quantity: number; note?: string }) {
+    return apiRequest<SingleResponse<Product>>(`${API_ROUTES.ADMIN_PRODUCTS}/${productId}/restock`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
   deleteProductImage(imageId: number) {
     return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_PRODUCT_IMAGES}/${imageId}`, {
       method: "DELETE",
       auth: true,
     });
+  },
+
+  exportProductsUrl() {
+    return `${API_BASE_URL}${API_ROUTES.ADMIN_PRODUCT_EXPORT}`;
+  },
+
+  async importProducts(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return apiRequest<{ success: boolean; message: string; data: { imported: number } }>(API_ROUTES.ADMIN_PRODUCT_IMPORT, {
+      method: "POST",
+      auth: true,
+      body: formData,
+    });
+  },
+
+  createBrand(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<CatalogBrand>>(API_ROUTES.ADMIN_BRANDS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteBrand(brandId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_BRANDS}/${brandId}`, { method: "DELETE", auth: true });
+  },
+
+  createTag(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<CatalogTag>>(API_ROUTES.ADMIN_TAGS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteTag(tagId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_TAGS}/${tagId}`, { method: "DELETE", auth: true });
+  },
+
+  createCollection(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<ProductCollection>>(API_ROUTES.ADMIN_COLLECTIONS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteCollection(collectionId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_COLLECTIONS}/${collectionId}`, { method: "DELETE", auth: true });
+  },
+
+  createSizeGuide(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<SizeGuide>>(API_ROUTES.ADMIN_SIZE_GUIDES, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteSizeGuide(sizeGuideId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_SIZE_GUIDES}/${sizeGuideId}`, { method: "DELETE", auth: true });
+  },
+
+  async downloadProductsCsv() {
+    const response = await fetch(`${API_BASE_URL}${API_ROUTES.ADMIN_PRODUCT_EXPORT}`, {
+      headers: { Authorization: `Bearer ${getToken() || ""}`, Accept: "text/csv" },
+    });
+    if (!response.ok) throw new Error("Product export failed");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "products.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
   },
 
   createCategory(payload: Record<string, unknown>) {

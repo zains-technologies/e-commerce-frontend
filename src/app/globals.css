@@ -90,6 +90,15 @@ textarea {
   }
 }
 
+@keyframes notice-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 180ms ease-out;
 }
@@ -104,4 +113,8 @@ textarea {
 
 .animate-toast-in {
   animation: toast-in 220ms ease-out;
+}
+
+.animate-notice-marquee {
+  animation: notice-marquee 18s linear infinite;
 }

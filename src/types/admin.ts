@@ -1,4 +1,5 @@
 import type { Product } from "./product";
+import type { CatalogBrand, CatalogTag, ProductCollection, SizeGuide } from "./product";
 import type { Category } from "./category";
 
 export interface Order {
@@ -93,6 +94,12 @@ export interface StoreSettings {
   } | null;
   settings?: {
     delivery_fee?: number;
+    promo_notice?: {
+      enabled?: boolean;
+      message?: string;
+      coupon_code?: string;
+      href?: string;
+    };
     [key: string]: unknown;
   } | null;
 }
@@ -125,4 +132,8 @@ export interface AdminDashboardData {
   notificationProducts?: Product[];
   notificationOrders?: Order[];
   notificationPayments?: Payment[];
+  brands?: CatalogBrand[];
+  tags?: CatalogTag[];
+  collections?: ProductCollection[];
+  sizeGuides?: SizeGuide[];
 }

@@ -2,19 +2,46 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart as RechartsBarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Building2,
+  ChartNoAxesCombined,
+  CreditCard,
+  FolderTree,
+  Gauge,
+  Home,
+  Layers3,
+  LogOut,
+  Package,
+  Percent,
+  RefreshCw,
+  ShoppingBag,
+  Store,
+  Users,
+} from "lucide-react";
 import { AdminCard, AdminTable, ConfirmDialog, Drawer, MetricCard, ToastMessage } from "@/components/admin/AdminPrimitives";
 import { Button } from "@/components/common/Button";
 import { Dropdown } from "@/components/common/Dropdown";
 import { Input } from "@/components/common/Input";
 import { EmptyState, ErrorState } from "@/components/common/StateBlock";
 import { useAdmin } from "@/hooks/useAdmin";
-import { formatCurrency, getPrimaryImage } from "@/lib/utils";
+import { cn, formatCurrency, getPrimaryImage } from "@/lib/utils";
 import { adminService } from "@/services/adminService";
 import { authService } from "@/services/authService";
 import type { Branch, Coupon, Order, Payment, StaffUser, StoreSettings } from "@/types/admin";
 import type { Category } from "@/types/category";
-import type { Product } from "@/types/product";
+import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductVariant, SizeGuide } from "@/types/product";
 
 const tabs = ["overview", "store", "products", "categories", "orders", "coupons", "reports", "payments", "inventory", "branches", "staff"] as const;
 type Tab = (typeof tabs)[number];
@@ -47,22 +74,62 @@ const tabHref: Record<Tab, string> = {
   staff: "/admin/staff",
 };
 
+const tabIcons: Record<Tab, ReactNode> = {
+  overview: <Gauge className="size-4" />,
+  store: <Store className="size-4" />,
+  products: <Package className="size-4" />,
+  categories: <FolderTree className="size-4" />,
+  orders: <ShoppingBag className="size-4" />,
+  coupons: <Percent className="size-4" />,
+  reports: <ChartNoAxesCombined className="size-4" />,
+  payments: <CreditCard className="size-4" />,
+  inventory: <Layers3 className="size-4" />,
+  branches: <Building2 className="size-4" />,
+  staff: <Users className="size-4" />,
+};
+
+const tabDescriptions: Record<Tab, string> = {
+  overview: "Performance, sales, and daily store health.",
+  store: "Tenant settings, plan, domain, contact, and theme.",
+  products: "Catalog management with images, stock, and pricing.",
+  categories: "Category structure and storefront browsing.",
+  orders: "Fulfillment, statuses, and customer order activity.",
+  coupons: "Discount campaigns for mid and pro stores.",
+  reports: "Sales, profit, and best-selling product insights.",
+  payments: "COD, bank transfer, and payment status review.",
+  inventory: "Low-stock monitoring and inventory movement logs.",
+  branches: "Multi-branch configuration for pro stores.",
+  staff: "Admin, manager, and staff user access.",
+};
+
 type ProductDraft = {
   id?: number;
   category_id: string;
+  brand_id: string;
+  size_guide_id: string;
   name: string;
   slug: string;
   description: string;
+  seo_title: string;
+  seo_description: string;
+  seo_keywords: string;
   price: string;
   cost_price: string;
   sku: string;
   stock_quantity: string;
   status: string;
   is_featured: boolean;
+  tag_ids: number[];
+  collection_ids: number[];
+  related_product_ids: number[];
+  specifications_text: string;
+  variants_text: string;
 };
 
 type CategoryDraft = {
   id?: number;
+  is_parent: boolean;
+  parent_id: string;
   name: string;
   slug: string;
   description: string;
@@ -118,14 +185,54 @@ type StoreDraft = {
   secondary: string;
   accent: string;
   delivery_fee: string;
+  notice_enabled: boolean;
+  notice_message: string;
+  notice_coupon_code: string;
+  notice_href: string;
 };
 
-const emptyProduct: ProductDraft = { category_id: "1", name: "", slug: "", description: "", price: "", cost_price: "", sku: "", stock_quantity: "", status: "active", is_featured: false };
-const emptyCategory: CategoryDraft = { name: "", slug: "", description: "", is_active: true };
+type RestockDraft = {
+  product?: Product;
+  quantity: string;
+  note: string;
+};
+
+type CatalogQuickDraft = {
+  brand: string;
+  tag: string;
+  collection: string;
+  sizeGuide: string;
+};
+
+const emptyProduct: ProductDraft = {
+  category_id: "1",
+  brand_id: "",
+  size_guide_id: "",
+  name: "",
+  slug: "",
+  description: "",
+  seo_title: "",
+  seo_description: "",
+  seo_keywords: "",
+  price: "",
+  cost_price: "",
+  sku: "",
+  stock_quantity: "",
+  status: "active",
+  is_featured: false,
+  tag_ids: [],
+  collection_ids: [],
+  related_product_ids: [],
+  specifications_text: "",
+  variants_text: "",
+};
+const emptyCategory: CategoryDraft = { is_parent: true, parent_id: "", name: "", slug: "", description: "", is_active: true };
 const emptyCoupon: CouponDraft = { code: "", type: "percentage", value: "10", starts_at: "", ends_at: "", usage_limit: "50", is_active: true };
 const emptyBranch: BranchDraft = { name: "", phone: "", address: "", is_active: true };
 const emptyStaff: StaffDraft = { name: "", email: "", phone: "", role: "staff", password: "password" };
-const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", currency: "LKR", domain: "localhost", custom_domain: "", plan: "simple", primary: "#111111", secondary: "#d8dfcc", accent: "#ef4444", delivery_fee: "0" };
+const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", currency: "LKR", domain: "localhost", custom_domain: "", plan: "simple", primary: "#111111", secondary: "#d8dfcc", accent: "#ef4444", delivery_fee: "0", notice_enabled: false, notice_message: "", notice_coupon_code: "", notice_href: "/products" };
+const emptyRestock: RestockDraft = { quantity: "10", note: "Manual restock from admin panel" };
+const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", sizeGuide: "" };
 const planOptions = [{ label: "Simple", value: "simple" }, { label: "Mid", value: "mid" }, { label: "Pro", value: "pro" }];
 const productStatusOptions = [{ label: "Active", value: "active" }, { label: "Inactive", value: "inactive" }, { label: "Draft", value: "draft" }];
 const couponTypeOptions = [{ label: "Percentage", value: "percentage" }, { label: "Fixed", value: "fixed" }];
@@ -187,63 +294,104 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
   }
 
   return (
-    <main className="min-h-screen bg-white">
-      <div className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
-        <div className="container-shell flex h-16 items-center justify-between">
-          <Link href="/" className="font-black tracking-tight">ECOMMERCE</Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-neutral-500 md:inline">{user ? `${user.name} · ${user.role}` : "Platform Admin"}</span>
-            <NotificationBell
-              open={notificationsOpen}
-              notifications={notifications}
-              onToggle={() => setNotificationsOpen((value) => !value)}
-              onSelect={(nextTab) => {
-                router.push(tabHref[nextTab]);
-                setNotificationsOpen(false);
-              }}
-            />
-            <Link href="/products" className="hidden text-xs font-bold uppercase text-neutral-500 hover:text-black md:inline">Storefront</Link>
-            <Button variant="outline" className="h-9 px-4" onClick={logout}>Logout</Button>
+    <main className="min-h-screen bg-[#f6f6f3] text-black">
+      <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
+        <aside className="hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
+          <div className="border-b border-neutral-100 px-6 py-5">
+            <Link href="/admin" className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-2xl bg-black text-white">
+                <ShoppingBag className="size-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-black uppercase tracking-wide">ECOMMERCE</span>
+                <span className="text-xs text-neutral-500">Commerce control panel</span>
+              </span>
+            </Link>
           </div>
-        </div>
-      </div>
-
-      <div className="container-shell py-6">
-        <section className="relative overflow-hidden rounded-[32px] bg-[#d8dfcc] p-6 md:p-10">
-          <div className="absolute inset-y-0 right-0 hidden w-1/2 opacity-70 md:block">
-            <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1100&q=85" alt="" className="image-cover" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#d8dfcc] via-[#d8dfcc]/50 to-transparent" />
-          </div>
-          <div className="relative max-w-2xl">
-            <p className="text-xs font-bold uppercase text-black/50">Store command center</p>
-            <h1 className="mt-4 text-5xl font-medium leading-[0.9] tracking-[-0.08em] md:text-7xl">Admin panel</h1>
-            <p className="mt-5 max-w-md text-sm leading-6 text-black/65">Complete admin surface for catalog, orders, payments, reports, inventory, branches, and staff.</p>
-          </div>
-        </section>
-      </div>
-
-      <div className="container-shell grid gap-6 pb-10 lg:grid-cols-[250px_1fr]">
-        <aside className="lg:sticky lg:top-24 lg:h-fit">
-          <nav className="hide-scrollbar flex gap-2 overflow-x-auto rounded-[28px] border border-neutral-200 bg-white p-2 lg:grid">
+          <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
             {tabs.map((item) => (
-              <Link key={item} href={tabHref[item]} className={`shrink-0 rounded-full px-4 py-3 text-left text-xs font-bold uppercase ${tab === item ? "bg-black text-white" : "text-neutral-600 hover:bg-neutral-100 hover:text-black"}`}>
+              <Link
+                key={item}
+                href={tabHref[item]}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-neutral-600 hover:bg-neutral-100 hover:text-black",
+                  tab === item && "bg-black text-white hover:bg-black hover:text-white",
+                )}
+              >
+                {tabIcons[item]}
                 {tabLabels[item]}
               </Link>
             ))}
           </nav>
-        </aside>
-
-        <section className="space-y-6">
-          <div className="flex flex-col justify-between gap-3 border-b border-neutral-100 pb-5 md:flex-row md:items-end">
-            <div>
-              <h2 className="text-4xl font-medium tracking-[-0.07em]">{tabLabels[tab]}</h2>
-              <p className="mt-2 text-sm text-neutral-500">CRUD actions use your Laravel admin endpoints and refresh after saving.</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="h-10 px-5" onClick={() => exportAdminCsv(tab, data)}>Export CSV</Button>
-              <Button variant="outline" className="h-10 px-5" disabled={refreshing} onClick={refresh}>{refreshing ? "Refreshing..." : "Refresh"}</Button>
+          <div className="border-t border-neutral-100 p-4">
+            <div className="rounded-[24px] bg-[#d8dfcc] p-4">
+              <p className="text-xs font-bold uppercase text-black/60">Active workspace</p>
+              <p className="mt-2 text-lg font-black">{data.store?.name || "Platform Admin"}</p>
+              <p className="mt-1 text-xs text-black/60">Plan-based ecommerce backend</p>
             </div>
           </div>
+        </aside>
+
+        <section className="flex min-w-0 flex-col">
+          <header className="sticky top-0 z-40 border-b border-neutral-200 bg-white/90 backdrop-blur">
+            <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <Link href="/admin" className="grid size-10 place-items-center rounded-2xl bg-black text-white lg:hidden">
+                  <ShoppingBag className="size-5" />
+                </Link>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase text-neutral-500">Admin workspace</p>
+                  <h1 className="truncate text-2xl font-medium tracking-[-0.05em]">{tabLabels[tab]}</h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="hidden text-sm text-neutral-500 md:inline">{user ? `${user.name} · ${user.role}` : "Platform Admin"}</span>
+                <NotificationBell
+                  open={notificationsOpen}
+                  notifications={notifications}
+                  onToggle={() => setNotificationsOpen((value) => !value)}
+                  onSelect={(nextTab) => {
+                    router.push(tabHref[nextTab]);
+                    setNotificationsOpen(false);
+                  }}
+                />
+                <Link href="/products" className="hidden h-10 items-center rounded-full border border-neutral-200 bg-white px-4 text-xs font-bold uppercase hover:border-black md:inline-flex">
+                  <Home className="mr-2 size-4" />
+                  Storefront
+                </Link>
+                <Button variant="outline" className="h-10 px-4" onClick={logout}>
+                  <LogOut className="mr-2 size-4" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+            <nav className="hide-scrollbar flex gap-2 overflow-x-auto border-t border-neutral-100 px-4 py-2 lg:hidden">
+              {tabs.map((item) => (
+                <Link key={item} href={tabHref[item]} className={cn("flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold uppercase", tab === item ? "bg-black text-white" : "bg-neutral-100 text-neutral-600")}>
+                  {tabIcons[item]}
+                  {tabLabels[item]}
+                </Link>
+              ))}
+            </nav>
+          </header>
+
+          <div className="flex-1 space-y-6 px-4 py-6 md:px-6 xl:px-8">
+            <div className="flex flex-col justify-between gap-4 rounded-[28px] border border-neutral-200 bg-white p-5 md:flex-row md:items-center">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-neutral-500">{tab === "overview" ? "Command center" : "Management"}</p>
+                <h2 className="mt-2 text-4xl font-medium tracking-[-0.07em]">{tabLabels[tab]}</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">{tabDescriptions[tab]}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button variant="outline" className="h-10 px-5" onClick={() => exportAdminCsv(tab, data)}>Export CSV</Button>
+                <Button variant="outline" className="h-10 px-5" onClick={() => exportAdminExcel(tab, data)}>Excel</Button>
+                <Button variant="outline" className="h-10 px-5" onClick={() => exportAdminPdf(tab, data)}>PDF</Button>
+                <Button variant="outline" className="h-10 px-5" disabled={refreshing} onClick={refresh}>
+                  <RefreshCw className={cn("mr-2 size-4", refreshing && "animate-spin")} />
+                  {refreshing ? "Refreshing" : "Refresh"}
+                </Button>
+              </div>
+            </div>
 
           {message && <ToastMessage message={message.text} tone={message.tone} onClose={() => setMessage(null)} />}
 
@@ -263,6 +411,11 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
                 <ProductPanel
                   products={filteredProducts}
                   categories={data.categories}
+                  brands={data.brands || []}
+                  tags={data.tags || []}
+                  collections={data.collections || []}
+                  sizeGuides={data.sizeGuides || []}
+                  allProducts={data.products}
                   busy={busy}
                   search={search}
                   setSearch={setSearch}
@@ -291,7 +444,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
               )}
 
               {tab === "inventory" && (
-                <InventoryPanel products={data.products} logs={data.inventoryLogs} />
+                <InventoryPanel products={data.products} logs={data.inventoryLogs} busy={busy} run={run} />
               )}
 
               {tab === "branches" && (
@@ -303,19 +456,21 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
               )}
             </>
           )}
+          </div>
+
+          <footer className="border-t border-neutral-200 bg-white px-4 py-5 md:px-6 xl:px-8">
+            <div className="flex flex-col justify-between gap-2 text-xs text-neutral-500 md:flex-row md:items-center">
+              <p>© {new Date().getFullYear()} All rights reserved.</p>
+              <p>
+                Built by{" "}
+                <a className="font-bold text-black hover:text-neutral-600" href="https://www.mintboxstudio.com/" target="_blank" rel="noreferrer">
+                  MintBox.Studio
+                </a>
+              </p>
+            </div>
+          </footer>
         </section>
       </div>
-      <footer className="border-t border-neutral-100 py-6">
-        <div className="container-shell flex flex-col justify-between gap-2 text-xs text-neutral-500 md:flex-row md:items-center">
-          <p>© {new Date().getFullYear()} All rights reserved.</p>
-          <p>
-            Built by{" "}
-            <a className="font-bold text-black hover:text-neutral-600" href="https://www.mintboxstudio.com/" target="_blank" rel="noreferrer">
-              MintBox.Studio
-            </a>
-          </p>
-        </div>
-      </footer>
     </main>
   );
 }
@@ -331,12 +486,12 @@ function OverviewPanel({ revenue, pendingOrders, lowStock, data }: { revenue: nu
       </div>
       <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
         <AdminCard>
-          <h2 className="mb-4 text-2xl font-medium tracking-[-0.04em]">Sales trend</h2>
-          <BarChart rows={(data.salesReport?.sales_by_date || []).map((row) => ({ label: row.date, value: Number(row.revenue) }))} />
+          <PanelTitle title="Sales trend" subtitle="Revenue by date from the Laravel reports endpoint." />
+          <SalesAreaChart rows={(data.salesReport?.sales_by_date || []).map((row) => ({ label: row.date, revenue: Number(row.revenue), orders: Number(row.orders) }))} />
         </AdminCard>
         <AdminCard>
-          <h2 className="mb-4 text-2xl font-medium tracking-[-0.04em]">Best sellers</h2>
-          <MiniList items={(data.salesReport?.best_selling_products || []).map((item) => ({ label: item.product_name, value: `${item.quantity_sold} sold` }))} />
+          <PanelTitle title="Best sellers" subtitle="Top products by quantity sold." />
+          <BestSellerChart rows={(data.salesReport?.best_selling_products || []).map((item) => ({ label: item.product_name, quantity: Number(item.quantity_sold), revenue: Number(item.revenue) }))} />
         </AdminCard>
       </div>
       <AdminCard>
@@ -496,6 +651,30 @@ function StorePanel({ store, busy, run }: { store?: StoreSettings; busy: boolean
             <ColorInput label="Accent" value={draft.accent} onChange={(value) => setDraft({ ...draft, accent: value })} />
           </div>
           <Input placeholder="Delivery fee" type="number" value={draft.delivery_fee} onChange={(e) => setDraft({ ...draft, delivery_fee: e.target.value })} />
+          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4">
+            <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 text-sm">
+              <input type="checkbox" checked={draft.notice_enabled} onChange={(e) => setDraft({ ...draft, notice_enabled: e.target.checked })} />
+              Enable customer website notice
+            </label>
+            <div className="mt-3 grid gap-3">
+              <Input placeholder="Notice message, e.g. Use coupon 000102 for 5% discount for jewellery" value={draft.notice_message} onChange={(e) => setDraft({ ...draft, notice_message: e.target.value })} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input placeholder="Coupon code" value={draft.notice_coupon_code} onChange={(e) => setDraft({ ...draft, notice_coupon_code: e.target.value.toUpperCase() })} />
+                <Input placeholder="Notice link, e.g. /products" value={draft.notice_href} onChange={(e) => setDraft({ ...draft, notice_href: e.target.value })} />
+              </div>
+            </div>
+            {draft.notice_enabled && draft.notice_message && (
+              <div className="mt-4 overflow-hidden rounded-2xl bg-black py-3 text-white">
+                <div className="flex min-w-max animate-notice-marquee gap-8 text-xl font-black uppercase tracking-wide">
+                  {[1, 2, 3].map((item) => (
+                    <span key={item} className="whitespace-nowrap">
+                      {draft.notice_message}{draft.notice_coupon_code ? ` · Code ${draft.notice_coupon_code}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button disabled={busy}>{busy ? "Saving..." : "Save store"}</Button>
             <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
@@ -506,9 +685,14 @@ function StorePanel({ store, busy, run }: { store?: StoreSettings; busy: boolean
   );
 }
 
-function ProductPanel({ products, categories, busy, search, setSearch, run }: {
+function ProductPanel({ products, categories, brands, tags, collections, sizeGuides, allProducts, busy, search, setSearch, run }: {
   products: Product[];
   categories: Category[];
+  brands: CatalogBrand[];
+  tags: CatalogTag[];
+  collections: ProductCollection[];
+  sizeGuides: SizeGuide[];
+  allProducts: Product[];
   busy: boolean;
   search: string;
   setSearch: (value: string) => void;
@@ -520,6 +704,8 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
   const [imageError, setImageError] = useState("");
   const [viewer, setViewer] = useState<{ src: string; label: string } | null>(null);
   const [pendingImageDelete, setPendingImageDelete] = useState<{ id: number; label: string } | null>(null);
+  const [catalogDraft, setCatalogDraft] = useState<CatalogQuickDraft>(emptyCatalogQuick);
+  const [pendingCatalogDelete, setPendingCatalogDelete] = useState<{ type: "brand" | "tag" | "collection" | "sizeGuide"; id: number; label: string } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const editing = Boolean(draft.id);
@@ -539,15 +725,25 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
     setDraft({
       id: product.id,
       category_id: String(product.category?.id || categories[0]?.id || 1),
+      brand_id: product.brand?.id ? String(product.brand.id) : "",
+      size_guide_id: product.size_guide?.id ? String(product.size_guide.id) : "",
       name: product.name,
       slug: product.slug,
       description: product.description || "",
+      seo_title: product.seo?.title || "",
+      seo_description: product.seo?.description || "",
+      seo_keywords: product.seo?.keywords || "",
       price: String(product.price),
       cost_price: String(product.cost_price || 0),
       sku: product.sku || "",
       stock_quantity: String(product.stock_quantity),
       status: product.status || "active",
       is_featured: Boolean(product.is_featured),
+      tag_ids: (product.tags || []).map((tag) => tag.id),
+      collection_ids: (product.collections || []).map((collection) => collection.id),
+      related_product_ids: (product.related_products || []).map((related) => related.id),
+      specifications_text: (product.specifications || []).map((specification) => `${specification.name}: ${specification.value || ""}`).join("\n"),
+      variants_text: (product.variants || []).map((item) => variantToLine(item)).join("\n"),
     });
     setDrawerOpen(true);
   }
@@ -603,17 +799,71 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
     });
   }
 
+  function createCatalogItem(type: keyof CatalogQuickDraft) {
+    const value = catalogDraft[type].trim();
+    if (!value) return;
+    const payload = { name: value };
+    const actions = {
+      brand: () => adminService.createBrand(payload),
+      tag: () => adminService.createTag(payload),
+      collection: () => adminService.createCollection(payload),
+      sizeGuide: () => adminService.createSizeGuide({ name: value, rows: [], is_active: true }),
+    };
+
+    void run(actions[type], `${titleCase(type === "sizeGuide" ? "size guide" : type)} created.`);
+    setCatalogDraft((current) => ({ ...current, [type]: "" }));
+  }
+
+  function deleteCatalogItem() {
+    if (!pendingCatalogDelete) return;
+    const actions = {
+      brand: () => adminService.deleteBrand(pendingCatalogDelete.id),
+      tag: () => adminService.deleteTag(pendingCatalogDelete.id),
+      collection: () => adminService.deleteCollection(pendingCatalogDelete.id),
+      sizeGuide: () => adminService.deleteSizeGuide(pendingCatalogDelete.id),
+    };
+    const typeLabel = pendingCatalogDelete.type === "sizeGuide" ? "Size guide" : titleCase(pendingCatalogDelete.type);
+    setPendingCatalogDelete(null);
+    void run(actions[pendingCatalogDelete.type], `${typeLabel} deleted.`);
+  }
+
+  function importProducts(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    void run(() => adminService.importProducts(file), "Product CSV imported.");
+  }
+
   return (
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Product CRUD" subtitle="Create, update, delete, and inspect product images from the API." />
-        <Button type="button" onClick={openCreate}>Add product</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => run(() => adminService.downloadProductsCsv(), "Product CSV downloaded.")}>Export CSV</Button>
+          <label className="inline-flex h-12 cursor-pointer items-center justify-center rounded-full border border-neutral-300 px-6 text-xs font-bold uppercase hover:border-black">
+            Import CSV
+            <input className="sr-only" type="file" accept=".csv,text/csv" onChange={importProducts} />
+          </label>
+          <Button type="button" onClick={openCreate}>Add product</Button>
+        </div>
       </div>
+      <CatalogSetupPanel
+        brands={brands}
+        tags={tags}
+        collections={collections}
+        sizeGuides={sizeGuides}
+        draft={catalogDraft}
+        setDraft={setCatalogDraft}
+        createItem={createCatalogItem}
+        requestDelete={setPendingCatalogDelete}
+      />
       <Drawer open={drawerOpen} size="wide" title={editing ? "Edit product" : "Add product"} subtitle="Upload 3 to 5 product images. Selecting new files while editing replaces the current images." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-5">
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="grid gap-3">
-        <Dropdown value={draft.category_id} options={categories.map((category) => ({ label: category.name, value: String(category.id) }))} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
+        <Dropdown value={draft.category_id} options={categoryOptions(categories)} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
+        <Dropdown value={draft.brand_id} options={[{ label: "No brand", value: "" }, ...brands.map((brand) => ({ label: brand.name, value: String(brand.id) }))]} placeholder="Select brand" onChange={(value) => setDraft({ ...draft, brand_id: value })} />
+        <Dropdown value={draft.size_guide_id} options={[{ label: "No size guide", value: "" }, ...sizeGuides.map((guide) => ({ label: guide.name, value: String(guide.id) }))]} placeholder="Select size guide" onChange={(value) => setDraft({ ...draft, size_guide_id: value })} />
         <Input required placeholder="Product name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <Input required placeholder="Slug" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
         <Input placeholder="SKU" value={draft.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} />
@@ -622,10 +872,28 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
         <Input required placeholder="Stock quantity" type="number" value={draft.stock_quantity} onChange={(e) => setDraft({ ...draft, stock_quantity: e.target.value })} />
         <Dropdown value={draft.status} options={productStatusOptions} onChange={(value) => setDraft({ ...draft, status: value })} />
         <textarea className="min-h-24 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <Input placeholder="SEO title" value={draft.seo_title} onChange={(e) => setDraft({ ...draft, seo_title: e.target.value })} />
+        <textarea className="min-h-20 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none" placeholder="SEO description" value={draft.seo_description} onChange={(e) => setDraft({ ...draft, seo_description: e.target.value })} />
+        <Input placeholder="SEO keywords, comma separated" value={draft.seo_keywords} onChange={(e) => setDraft({ ...draft, seo_keywords: e.target.value })} />
         <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm">
           <input type="checkbox" checked={draft.is_featured} onChange={(e) => setDraft({ ...draft, is_featured: e.target.checked })} />
           Featured
         </label>
+        <CatalogMultiSelect title="Tags" items={tags} selected={draft.tag_ids} onChange={(tag_ids) => setDraft({ ...draft, tag_ids })} />
+        <CatalogMultiSelect title="Collections" items={collections} selected={draft.collection_ids} onChange={(collection_ids) => setDraft({ ...draft, collection_ids })} />
+        <CatalogMultiSelect title="Related products" items={allProducts.filter((item) => item.id !== draft.id)} selected={draft.related_product_ids} onChange={(related_product_ids) => setDraft({ ...draft, related_product_ids })} />
+        <textarea
+          className="min-h-28 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none"
+          placeholder={"Specifications, one per line\nFabric: Cotton\nFit: Regular"}
+          value={draft.specifications_text}
+          onChange={(e) => setDraft({ ...draft, specifications_text: e.target.value })}
+        />
+        <textarea
+          className="min-h-32 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none"
+          placeholder={"Variant combinations, one per line\nsize=M,color=Black | M / Black | SKU-M-BLK | 0 | 10"}
+          value={draft.variants_text}
+          onChange={(e) => setDraft({ ...draft, variants_text: e.target.value })}
+        />
           </div>
           <div className="rounded-[28px] border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-bold uppercase text-neutral-500">Product images</p>
@@ -700,6 +968,14 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
         }}
       />
       <ImagePreviewDialog image={viewer} onClose={() => setViewer(null)} />
+      <ConfirmDialog
+        open={Boolean(pendingCatalogDelete)}
+        busy={busy}
+        title={`Delete ${pendingCatalogDelete?.label || "item"}?`}
+        message="This removes the catalog setup item. Existing products using it may lose that association."
+        onCancel={() => setPendingCatalogDelete(null)}
+        onConfirm={deleteCatalogItem}
+      />
 
       <div className="mb-4 max-w-md">
         <Input placeholder="Search products, SKU, category" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
@@ -716,10 +992,11 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
         </div>
       </div>
 
-      <AdminTable columns={["Image", "Name", "Category", "Price", "Stock", "Status", "Actions"]} rows={paginatedProducts.map((product) => [
+      <AdminTable columns={["Image", "Name", "Category", "Brand", "Price", "Stock", "Status", "Actions"]} rows={paginatedProducts.map((product) => [
         <img key="img" src={getPrimaryImage(product.images)} alt={product.name} className="size-16 rounded-2xl object-cover" />,
         <span key="name"><strong>{product.name}</strong><br /><small className="text-neutral-500">{product.sku || product.slug}</small></span>,
         product.category?.name || "-",
+        product.brand?.name || "-",
         formatCurrency(product.price),
         <span key="stock" className={product.low_stock || product.stock_quantity <= 10 ? "font-bold text-red-600" : ""}>{product.stock_quantity}</span>,
         product.status || "active",
@@ -729,19 +1006,133 @@ function ProductPanel({ products, categories, busy, search, setSearch, run }: {
   );
 }
 
+function CatalogMultiSelect({
+  title,
+  items,
+  selected,
+  onChange,
+}: {
+  title: string;
+  items: Array<{ id: number; name: string }>;
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  if (!items.length) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-neutral-200 p-4 text-sm text-neutral-500">
+        No {title.toLowerCase()} yet.
+      </div>
+    );
+  }
+
+  function toggle(id: number) {
+    onChange(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]);
+  }
+
+  return (
+    <div className="rounded-[24px] border border-neutral-200 p-4">
+      <p className="mb-3 text-xs font-bold uppercase text-neutral-500">{title}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={cn("rounded-full border px-3 py-2 text-xs font-bold uppercase transition", selected.includes(item.id) ? "border-black bg-black text-white" : "border-neutral-200 bg-white hover:border-black")}
+            onClick={() => toggle(item.id)}
+          >
+            {item.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CatalogSetupPanel({
+  brands,
+  tags,
+  collections,
+  sizeGuides,
+  draft,
+  setDraft,
+  createItem,
+  requestDelete,
+}: {
+  brands: CatalogBrand[];
+  tags: CatalogTag[];
+  collections: ProductCollection[];
+  sizeGuides: SizeGuide[];
+  draft: CatalogQuickDraft;
+  setDraft: (draft: CatalogQuickDraft) => void;
+  createItem: (type: keyof CatalogQuickDraft) => void;
+  requestDelete: (item: { type: "brand" | "tag" | "collection" | "sizeGuide"; id: number; label: string }) => void;
+}) {
+  const groups = [
+    { key: "brand" as const, title: "Brands", value: draft.brand, items: brands },
+    { key: "tag" as const, title: "Tags", value: draft.tag, items: tags },
+    { key: "collection" as const, title: "Collections", value: draft.collection, items: collections },
+    { key: "sizeGuide" as const, title: "Size guides", value: draft.sizeGuide, items: sizeGuides },
+  ];
+
+  return (
+    <div className="mb-5 grid gap-3 rounded-[28px] border border-neutral-200 bg-neutral-50 p-4 lg:grid-cols-4">
+      {groups.map((group) => (
+        <div key={group.key} className="rounded-[22px] bg-white p-4">
+          <p className="text-xs font-bold uppercase text-neutral-500">{group.title}</p>
+          <div className="mt-3 flex gap-2">
+            <Input
+              placeholder={`Add ${group.title.toLowerCase()}`}
+              value={group.value}
+              onChange={(event) => setDraft({ ...draft, [group.key]: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  createItem(group.key);
+                }
+              }}
+            />
+            <Button type="button" className="h-11 px-4" onClick={() => createItem(group.key)}>Add</Button>
+          </div>
+          <div className="mt-3 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
+            {group.items.map((item) => (
+              <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1 text-xs font-bold">
+                {item.name}
+                <button
+                  type="button"
+                  className="text-neutral-400 hover:text-red-600"
+                  aria-label={`Delete ${item.name}`}
+                  onClick={() => requestDelete({ type: group.key, id: item.id, label: item.name })}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {!group.items.length && <span className="text-xs text-neutral-400">No records yet</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<CategoryDraft>(emptyCategory);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
+  const parentOptions = categoryParentOptions(categories, draft.id);
+  const selectedParent = categories.find((category) => String(category.id) === draft.parent_id);
 
   function edit(category: Category) {
-    setDraft({ id: category.id, name: category.name, slug: category.slug, description: category.description || "", is_active: Boolean(category.is_active) });
+    setDraft({ id: category.id, is_parent: Boolean(category.show_in_header), parent_id: category.parent_id ? String(category.parent_id) : "", name: category.name, slug: category.slug, description: category.description || "", is_active: Boolean(category.is_active) });
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const payload = { name: draft.name, slug: draft.slug, description: draft.description, is_active: draft.is_active };
+    if (!draft.is_parent && !draft.parent_id) {
+      return;
+    }
+    const payload = { parent_id: draft.is_parent ? null : Number(draft.parent_id), show_in_header: draft.is_parent, name: draft.name, slug: draft.slug, description: draft.description, is_active: draft.is_active };
     await run(() => editing && draft.id ? adminService.updateCategory(draft.id, payload) : adminService.createCategory(payload), editing ? "Category updated." : "Category created.");
     setDraft(emptyCategory);
     setDrawerOpen(false);
@@ -753,19 +1144,58 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
         <PanelTitle title="Category CRUD" subtitle="Manage active/inactive categories and slugs." />
         <Button type="button" onClick={() => { setDraft(emptyCategory); setDrawerOpen(true); }}>Add category</Button>
       </div>
-      <Drawer open={drawerOpen} title={editing ? "Edit category" : "Add category"} subtitle="Categories control storefront browsing and product grouping." onClose={() => setDrawerOpen(false)}>
+      <Drawer open={drawerOpen} title={editing ? "Edit category" : "Add category"} subtitle="Enable parent category to show it in the header. Disable it to place this category under another category." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-3">
-        <Input required placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <label className="flex items-center justify-between gap-4 rounded-[24px] border border-neutral-200 px-4 py-3 text-sm">
+          <span>
+            <strong className="block">Show in header</strong>
+            <small className="text-neutral-500">Show this category as a main header item.</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={draft.is_parent}
+            onChange={(event) => setDraft({ ...draft, is_parent: event.target.checked, parent_id: event.target.checked ? "" : draft.parent_id })}
+          />
+        </label>
+        {!draft.is_parent && (
+          <Dropdown
+            value={draft.parent_id}
+            options={parentOptions}
+            placeholder="Select parent category"
+            onChange={(value) => setDraft({ ...draft, parent_id: value })}
+          />
+        )}
+        <Input
+          required
+          placeholder={draft.is_parent ? "Parent category name, e.g. Men" : "Subcategory name, e.g. Footwear or Birkenstock Slipper"}
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value, slug: draft.slug || slugify(e.target.value) })}
+        />
         <Input required placeholder="Slug" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
         <Input placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <div className="rounded-[22px] bg-neutral-50 p-4 text-sm text-neutral-600">
+          {draft.is_parent
+            ? "This will appear as a main item on the storefront header."
+            : selectedParent
+              ? `This will appear under ${selectedParent.name}. Nested paths like Men > Footwear > Birkenstock Slipper are supported.`
+              : "Select which parent category this belongs under."}
+        </div>
         <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm">
           <input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active
         </label>
-        <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update category" : "Create category"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
+        <div className="flex gap-2">
+          <Button disabled={busy || (!draft.is_parent && !draft.parent_id)}>{editing ? "Update category" : "Create category"}</Button>
+          <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
+        </div>
       </form>
       </Drawer>
-      <AdminTable columns={["Name", "Slug", "Status", "Actions"]} rows={categories.map((category) => [
-        category.name,
+      <AdminTable columns={["Name", "Path", "Header", "Slug", "Status", "Actions"]} rows={categories.map((category) => [
+        <span key="name" className={cn("block", category.parent_id && "pl-5")}>
+          <strong>{category.parent_id ? `↳ ${category.name}` : category.name}</strong>
+          {category.children?.length ? <small className="ml-2 text-neutral-500">({category.children.length} dropdown items)</small> : null}
+        </span>,
+        categoryPath(category, categories),
+        category.show_in_header ? "Shown" : "-",
         category.slug,
         category.is_active ? "Active" : "Inactive",
         <ActionButtons key="actions" busy={busy} onEdit={() => edit(category)} onDelete={() => run(() => adminService.deleteCategory(category.id), "Category deleted.")} />,
@@ -849,7 +1279,7 @@ function ReportsPanel({ data }: { data: ReturnType<typeof useAdmin>["data"] }) {
           <PanelTitle title="Sales by date" subtitle="Generated from /admin/reports/sales" />
           <Button variant="outline" onClick={() => exportCsv("sales-report", data.salesReport?.sales_by_date || [])}>Export sales</Button>
         </div>
-        <BarChart rows={(data.salesReport?.sales_by_date || []).map((row) => ({ label: row.date, value: Number(row.revenue) }))} />
+        <SalesAreaChart rows={(data.salesReport?.sales_by_date || []).map((row) => ({ label: row.date, revenue: Number(row.revenue), orders: Number(row.orders) }))} />
       </AdminCard>
       <AdminCard>
         <div className="mb-4 flex items-center justify-between">
@@ -878,23 +1308,57 @@ function PaymentsPanel({ payments, busy, run }: { payments: Payment[]; busy: boo
   );
 }
 
-function InventoryPanel({ products, logs }: { products: Product[]; logs: ReturnType<typeof useAdmin>["data"]["inventoryLogs"] }) {
+function InventoryPanel({ products, logs, busy, run }: { products: Product[]; logs: ReturnType<typeof useAdmin>["data"]["inventoryLogs"]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const lowStock = products.filter((product) => product.low_stock || product.stock_quantity <= 10);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [draft, setDraft] = useState<RestockDraft>(emptyRestock);
+
+  function openRestock(product: Product) {
+    setDraft({ product, quantity: "10", note: `Restock ${product.name}` });
+    setDrawerOpen(true);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!draft.product) return;
+    await run(() => adminService.restockProduct(draft.product!.id, { quantity: Number(draft.quantity), note: draft.note }), "Product restocked.");
+    setDraft(emptyRestock);
+    setDrawerOpen(false);
+  }
+
   return (
     <div className="grid gap-4">
       <AdminCard>
         <PanelTitle title="Low stock flags" subtitle="Products at or below the low-stock threshold." />
-        <AdminTable columns={["Image", "Product", "SKU", "Stock"]} rows={lowStock.map((product) => [
+        <AdminTable columns={["Image", "Product", "SKU", "Stock", "Action"]} rows={lowStock.map((product) => [
           <img key="img" src={getPrimaryImage(product.images)} alt={product.name} className="size-14 rounded-2xl object-cover" />,
           product.name,
           product.sku || "-",
           <span key="stock" className="font-bold text-red-600">{product.stock_quantity}</span>,
+          <Button key="restock" type="button" className="h-8 px-3" onClick={() => openRestock(product)}>Restock</Button>,
         ])} />
       </AdminCard>
       <AdminCard>
         <PanelTitle title="Inventory logs" subtitle="Stock changes generated by orders and adjustments." />
         <AdminTable columns={["Type", "Product", "Change", "Stock After", "Note"]} rows={logs.map((log) => [log.type, log.product_id, log.quantity_change, log.stock_after, log.note || "-"])} />
       </AdminCard>
+      <Drawer open={drawerOpen} title="Restock product" subtitle="Add new stock and keep an inventory audit trail." onClose={() => setDrawerOpen(false)}>
+        <form onSubmit={submit} className="grid gap-3">
+          {draft.product && (
+            <div className="rounded-[24px] bg-neutral-50 p-4">
+              <p className="text-[11px] font-bold uppercase text-neutral-500">Product</p>
+              <p className="mt-2 font-black">{draft.product.name}</p>
+              <p className="text-sm text-neutral-500">Current stock: {draft.product.stock_quantity}</p>
+            </div>
+          )}
+          <Input required min={1} type="number" placeholder="Quantity to add" value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} />
+          <Input placeholder="Restock note" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          <div className="flex gap-2">
+            <Button disabled={busy}>{busy ? "Saving..." : "Confirm restock"}</Button>
+            <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
+          </div>
+        </form>
+      </Drawer>
     </div>
   );
 }
@@ -1160,34 +1624,51 @@ function ActionButtons({ busy, onEdit, onDelete }: { busy?: boolean; onEdit: () 
   );
 }
 
-function MiniList({ items }: { items: Array<{ label: string; value: string }> }) {
-  if (!items.length) return <EmptyState message="No report rows yet." />;
+function SalesAreaChart({ rows }: { rows: Array<{ label: string; revenue: number; orders: number }> }) {
+  if (!rows.length) return <EmptyState message="No chart data yet." />;
   return (
-    <div className="space-y-3">
-      {items.slice(0, 6).map((item) => (
-        <div key={item.label} className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3 text-sm">
-          <span className="font-bold">{item.label}</span>
-          <span className="text-neutral-500">{item.value}</span>
-        </div>
-      ))}
+    <div className="mt-5 h-[310px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={rows.slice(-12)} margin={{ left: 0, right: 12, top: 12, bottom: 0 }}>
+          <defs>
+            <linearGradient id="salesRevenue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#111827" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="#111827" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="#e5e5e5" />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#737373", fontSize: 12 }} />
+          <YAxis tickLine={false} axisLine={false} width={72} tick={{ fill: "#737373", fontSize: 12 }} tickFormatter={(value) => formatCurrency(Number(value)).replace("LKR", "").trim()} />
+          <Tooltip
+            cursor={{ stroke: "#111827", strokeWidth: 1 }}
+            contentStyle={{ borderRadius: 18, border: "1px solid #e5e5e5", boxShadow: "0 18px 45px rgba(0,0,0,0.12)" }}
+            formatter={(value, name) => [name === "revenue" ? formatCurrency(Number(value)) : value, titleCase(String(name))]}
+          />
+          <Area type="monotone" dataKey="revenue" stroke="#111827" strokeWidth={3} fill="url(#salesRevenue)" />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-function BarChart({ rows }: { rows: Array<{ label: string; value: number }> }) {
-  if (!rows.length) return <EmptyState message="No chart data yet." />;
-  const max = Math.max(...rows.map((row) => row.value), 1);
+function BestSellerChart({ rows }: { rows: Array<{ label: string; quantity: number; revenue: number }> }) {
+  if (!rows.length) return <EmptyState message="No best-selling products yet." />;
+
   return (
-    <div className="space-y-3">
-      {rows.slice(-10).map((row) => (
-        <div key={row.label} className="grid grid-cols-[105px_1fr_90px] items-center gap-3 text-sm">
-          <span className="truncate text-neutral-500">{row.label}</span>
-          <div className="h-4 overflow-hidden rounded-full bg-neutral-100">
-            <div className="h-full rounded-full bg-black" style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }} />
-          </div>
-          <strong className="text-right">{formatCurrency(row.value)}</strong>
-        </div>
-      ))}
+    <div className="mt-5 h-[310px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsBarChart data={rows.slice(0, 8)} layout="vertical" margin={{ left: 12, right: 12, top: 8, bottom: 8 }}>
+          <CartesianGrid horizontal={false} stroke="#e5e5e5" />
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="label" width={120} tickLine={false} axisLine={false} tick={{ fill: "#525252", fontSize: 12 }} />
+          <Tooltip
+            cursor={{ fill: "#f5f5f5" }}
+            contentStyle={{ borderRadius: 18, border: "1px solid #e5e5e5", boxShadow: "0 18px 45px rgba(0,0,0,0.12)" }}
+            formatter={(value, name) => [name === "revenue" ? formatCurrency(Number(value)) : value, titleCase(String(name))]}
+          />
+          <Bar dataKey="quantity" fill="#111827" radius={[0, 10, 10, 0]} barSize={18} />
+        </RechartsBarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -1195,26 +1676,114 @@ function BarChart({ rows }: { rows: Array<{ label: string; value: number }> }) {
 function productPayload(draft: ProductDraft) {
   return {
     category_id: Number(draft.category_id),
+    brand_id: draft.brand_id ? Number(draft.brand_id) : null,
+    size_guide_id: draft.size_guide_id ? Number(draft.size_guide_id) : null,
     name: draft.name,
     slug: draft.slug,
     description: draft.description,
+    seo_title: draft.seo_title,
+    seo_description: draft.seo_description,
+    seo_keywords: draft.seo_keywords,
     price: Number(draft.price),
     cost_price: Number(draft.cost_price || 0),
     sku: draft.sku,
     stock_quantity: Number(draft.stock_quantity),
     status: draft.status,
     is_featured: draft.is_featured,
+    tag_ids: draft.tag_ids,
+    collection_ids: draft.collection_ids,
+    related_product_ids: draft.related_product_ids,
+    specifications: parseSpecifications(draft.specifications_text),
+    variants: parseVariantLines(draft.variants_text),
   };
 }
 
 function productFormData(draft: ProductDraft, files: File[]) {
   const payload = productPayload(draft);
   const formData = new FormData();
-  Object.entries(payload).forEach(([key, value]) => {
-    formData.append(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
-  });
+  appendFormData(formData, payload);
   files.forEach((file) => formData.append("images[]", file));
   return formData;
+}
+
+function appendFormData(formData: FormData, payload: Record<string, unknown>, prefix?: string) {
+  Object.entries(payload).forEach(([key, value]) => {
+    const field = prefix ? `${prefix}[${key}]` : key;
+    if (value === null || value === undefined) {
+      formData.append(field, "");
+      return;
+    }
+    if (typeof value === "boolean") {
+      formData.append(field, value ? "1" : "0");
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (typeof item === "object" && item !== null) {
+          appendFormData(formData, item as Record<string, unknown>, `${field}[${index}]`);
+        } else {
+          formData.append(`${field}[]`, String(item));
+        }
+      });
+      return;
+    }
+    if (typeof value === "object") {
+      appendFormData(formData, value as Record<string, unknown>, field);
+      return;
+    }
+    formData.append(field, String(value));
+  });
+}
+
+function parseSpecifications(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [name, ...rest] = line.split(":");
+      return { name: name.trim(), value: rest.join(":").trim(), sort_order: index };
+    })
+    .filter((item) => item.name);
+}
+
+function parseVariantLines(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [optionsText = "", label = "", sku = "", priceAdjustment = "0", stock = "0"] = line.split("|").map((part) => part.trim());
+      const options = Object.fromEntries(
+        optionsText
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .map((part) => {
+            const [key, ...rest] = part.split("=");
+            return [key.trim(), rest.join("=").trim()];
+          })
+          .filter(([key, optionValue]) => key && optionValue),
+      );
+      const attributeValue = label || Object.values(options).join(" / ") || optionsText;
+
+      return {
+        attribute_name: Object.keys(options).length > 1 ? "combination" : Object.keys(options)[0] || "option",
+        attribute_value: attributeValue,
+        options,
+        sku,
+        price_adjustment: Number(priceAdjustment || 0),
+        stock_quantity: Number(stock || 0),
+      };
+    });
+}
+
+function variantToLine(variant: ProductVariant) {
+  const options = variant.options && Object.keys(variant.options).length
+    ? Object.entries(variant.options).map(([key, value]) => `${key}=${value}`).join(",")
+    : `${variant.attribute_name}=${variant.attribute_value}`;
+
+  return `${options} | ${variant.attribute_value} | ${variant.sku || ""} | ${variant.price_adjustment || 0} | ${variant.stock_quantity || 0}`;
 }
 
 function storeDraftFromStore(store: StoreSettings): StoreDraft {
@@ -1231,6 +1800,10 @@ function storeDraftFromStore(store: StoreSettings): StoreDraft {
     secondary: store.theme?.secondary || "#d8dfcc",
     accent: store.theme?.accent || "#ef4444",
     delivery_fee: String(store.settings?.delivery_fee || 0),
+    notice_enabled: Boolean(store.settings?.promo_notice?.enabled),
+    notice_message: store.settings?.promo_notice?.message || "",
+    notice_coupon_code: store.settings?.promo_notice?.coupon_code || "",
+    notice_href: store.settings?.promo_notice?.href || "/products",
   };
 }
 
@@ -1251,6 +1824,12 @@ function storePayload(draft: StoreDraft) {
     },
     settings: {
       delivery_fee: Number(draft.delivery_fee || 0),
+      promo_notice: {
+        enabled: draft.notice_enabled,
+        message: draft.notice_message,
+        coupon_code: draft.notice_coupon_code,
+        href: draft.notice_href || "/products",
+      },
     },
   };
 }
@@ -1311,7 +1890,71 @@ function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function categoryOptions(categories: Category[], excludeId?: number) {
+  const excludedIds = new Set(excludeId ? [excludeId, ...descendantIds(categories, excludeId)] : []);
+  return flattenCategoryTree(categories.filter((category) => !excludedIds.has(category.id))).map((category) => ({
+    label: `${"— ".repeat(category.depth)}${category.name}`,
+    value: String(category.id),
+  }));
+}
+
+function categoryParentOptions(categories: Category[], excludeId?: number) {
+  return categoryOptions(categories, excludeId);
+}
+
+function flattenCategoryTree(categories: Category[]) {
+  const childrenByParent = categories.reduce<Record<string, Category[]>>((groups, category) => {
+    const key = String(category.parent_id || "root");
+    groups[key] = [...(groups[key] || []), category];
+    return groups;
+  }, {});
+
+  const walk = (parentKey: string, depth = 0): Array<Category & { depth: number }> =>
+    (childrenByParent[parentKey] || [])
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((category) => [{ ...category, depth }, ...walk(String(category.id), depth + 1)]);
+
+  return walk("root");
+}
+
+function descendantIds(categories: Category[], parentId: number): number[] {
+  const children = categories.filter((category) => category.parent_id === parentId);
+  return children.flatMap((child) => [child.id, ...descendantIds(categories, child.id)]);
+}
+
+function categoryPath(category: Category, categories: Category[]) {
+  const path = [category.name];
+  let parentId = category.parent_id;
+  while (parentId) {
+    const parent = categories.find((item) => item.id === parentId);
+    if (!parent) break;
+    path.unshift(parent.name);
+    parentId = parent.parent_id || null;
+  }
+  return path.join(" > ");
+}
+
 function exportAdminCsv(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
+  exportCsv(`admin-${tab}`, getExportRows(tab, data));
+}
+
+function exportAdminExcel(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
+  exportExcel(`admin-${tab}`, getExportRows(tab, data));
+}
+
+function exportAdminPdf(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
+  exportPdf(`Admin ${tabLabels[tab]}`, getExportRows(tab, data));
+}
+
+function getExportRows(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
   const map: Record<Tab, unknown[]> = {
     overview: data.orders,
     store: data.store ? [data.store] : [],
@@ -1325,7 +1968,7 @@ function exportAdminCsv(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
     branches: data.branches,
     staff: data.staff,
   };
-  exportCsv(`admin-${tab}`, map[tab]);
+  return map[tab];
 }
 
 function exportCsv(filename: string, rows: unknown[]) {
@@ -1343,6 +1986,70 @@ function exportCsv(filename: string, rows: unknown[]) {
   link.download = `${filename}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function exportExcel(filename: string, rows: unknown[]) {
+  if (!rows.length) return;
+  const objects = rows.map((row) => flatten(row as Record<string, unknown>));
+  const headers = Object.keys(objects[0]);
+  const table = `
+    <table>
+      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${objects.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}</tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+  const blob = new Blob([table], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.xls`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPdf(title: string, rows: unknown[]) {
+  if (!rows.length) return;
+  const objects = rows.map((row) => flatten(row as Record<string, unknown>));
+  const headers = Object.keys(objects[0]);
+  const popup = window.open("", "_blank", "width=1200,height=800");
+  if (!popup) return;
+
+  popup.document.write(`
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 28px; color: #111; }
+          h1 { font-size: 24px; margin-bottom: 18px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #ddd; padding: 7px; text-align: left; vertical-align: top; }
+          th { background: #111; color: white; }
+          tr:nth-child(even) { background: #f7f7f7; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(title)}</h1>
+        <table>
+          <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+          <tbody>${objects.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody>
+        </table>
+        <script>window.onload = () => { window.print(); };</script>
+      </body>
+    </html>
+  `);
+  popup.document.close();
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] || character);
 }
 
 function flatten(row: Record<string, unknown>, prefix = ""): Record<string, string | number | boolean | null> {

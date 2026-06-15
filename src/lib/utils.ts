@@ -1,5 +1,8 @@
-export function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...classes: ClassValue[]) {
+  return twMerge(clsx(classes));
 }
 
 export function formatCurrency(value: number, currency = "LKR") {
@@ -39,4 +42,3 @@ export function setToken(token: string) {
 export function clearToken() {
   window.localStorage.removeItem("ecommerce_token");
 }
-

@@ -2,19 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 import { useCart } from "@/hooks/useCart";
+import { useNavigation } from "@/hooks/useNavigation";
 import { Input } from "@/components/common/Input";
 import { cn } from "@/lib/utils";
-
-const nav = [
-  { href: "/products", label: "All Category" },
-  { href: "/products", label: "Gift Cards" },
-  { href: "/products", label: "Special Event" },
-];
+import type { NavigationItem } from "@/types/navigation";
 
 export function Header() {
   const pathname = usePathname();
   const { count } = useCart();
+  const { navigation } = useNavigation();
 
   return (
     <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white/90 backdrop-blur">
@@ -37,16 +35,27 @@ export function Header() {
         <div className="hidden w-full max-w-[270px] md:block">
           <Input placeholder="Search here" className="h-9 text-xs" />
         </div>
-        <nav className="hidden flex-1 items-center justify-center gap-8 md:flex">
-          {nav.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn("text-xs font-semibold", pathname === item.href ? "text-black" : "text-neutral-600")}
-            >
-              {item.label}
-            </Link>
+        <nav className="hidden flex-1 items-center justify-center gap-7 whitespace-nowrap md:flex">
+          <HeaderLink href="/" active={pathname === "/"}>Home</HeaderLink>
+          <HeaderLink href="/products" active={pathname === "/products"}>Shop</HeaderLink>
+          {navigation.map((item) => (
+            <div key={item.slug} className="group relative">
+              <Link
+                href={`/products?category=${item.slug}`}
+                className="inline-flex items-center gap-1 text-sm font-black tracking-tight text-neutral-700 hover:text-black"
+              >
+                {item.title}
+                {item.children?.length ? <ChevronDown /> : null}
+              </Link>
+              {item.children?.length ? (
+                <div className="invisible absolute left-1/2 top-full z-[120] mt-4 min-w-56 -translate-x-1/2 rounded-[22px] border border-neutral-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
+                  <CategoryDropdownItems items={item.children} />
+                </div>
+              ) : null}
+            </div>
           ))}
+          <HeaderLink href="/products?collection=gift-cards">Gift Cards</HeaderLink>
+          <HeaderLink href="/products?tag=offers">OFFERS</HeaderLink>
         </nav>
         <div className="ml-auto flex items-center gap-4 text-xl">
           <Link aria-label="Wishlist" href="/products" className="hidden md:inline">♡</Link>
@@ -66,3 +75,37 @@ export function Header() {
   );
 }
 
+function HeaderLink({ href, active, children }: { href: string; active?: boolean; children: ReactNode }) {
+  return (
+    <Link href={href} className={cn("text-sm font-black tracking-tight hover:text-black", active ? "text-black" : "text-neutral-700")}>
+      {children}
+    </Link>
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg aria-hidden="true" className="mt-0.5 size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function CategoryDropdownItems({ items, depth = 0 }: { items: NavigationItem[]; depth?: number }) {
+  return (
+    <>
+      {items.map((item) => (
+        <div key={item.slug}>
+          <Link
+            href={`/products?category=${item.slug}`}
+            className="block rounded-2xl py-3 pr-4 text-xs font-bold text-neutral-600 hover:bg-neutral-100 hover:text-black"
+            style={{ paddingLeft: `${16 + depth * 14}px` }}
+          >
+            {depth > 0 ? "↳ " : ""}{item.title}
+          </Link>
+          {item.children?.length ? <CategoryDropdownItems items={item.children} depth={depth + 1} /> : null}
+        </div>
+      ))}
+    </>
+  );
+}

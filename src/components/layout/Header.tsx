@@ -54,8 +54,6 @@ export function Header() {
               ) : null}
             </div>
           ))}
-          <HeaderLink href="/products?collection=gift-cards">Gift Cards</HeaderLink>
-          <HeaderLink href="/products?tag=offers">OFFERS</HeaderLink>
         </nav>
         <div className="ml-auto flex items-center gap-4 text-xl">
           <Link aria-label="Wishlist" href="/products" className="hidden md:inline">♡</Link>

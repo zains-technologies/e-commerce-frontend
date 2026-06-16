@@ -6,6 +6,7 @@ import type { CatalogBrand, CatalogTag, Product, ProductCollection, SizeGuide } 
 import type {
   Branch,
   Coupon,
+  AuditLog,
   InventoryLog,
   Order,
   Payment,
@@ -14,6 +15,7 @@ import type {
   StaffUser,
   StoreSettings,
 } from "@/types/admin";
+import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
 
 type AdminPayload = Record<string, unknown> | FormData;
 
@@ -50,8 +52,15 @@ export const adminService = {
   coupons: () => apiRequest<PaginatedResponse<Coupon>>(API_ROUTES.ADMIN_COUPONS, { auth: true }).then((r) => r.data),
   payments: () => apiRequest<PaginatedResponse<Payment>>(API_ROUTES.ADMIN_PAYMENTS, { auth: true }).then((r) => r.data),
   inventoryLogs: () => apiRequest<PaginatedResponse<InventoryLog>>(API_ROUTES.ADMIN_INVENTORY_LOGS, { auth: true }).then((r) => r.data),
+  notifications: () => apiRequest<SingleResponse<Array<{ type: string; title: string; message: string; target: string }>>>(API_ROUTES.ADMIN_NOTIFICATIONS, { auth: true }).then((r) => r.data),
+  shippingMethods: () => apiRequest<SingleResponse<ShippingMethod[]>>(API_ROUTES.ADMIN_SHIPPING_METHODS, { auth: true }).then((r) => r.data),
+  marketingBanners: () => apiRequest<SingleResponse<MarketingBanner[]>>(API_ROUTES.ADMIN_BANNERS, { auth: true }).then((r) => r.data),
+  newsletterSubscribers: () => apiRequest<SingleResponse<PaginatedResponse<NewsletterSubscriber>>>(API_ROUTES.ADMIN_NEWSLETTER_SUBSCRIBERS, { auth: true }).then((r) => r.data.data),
+  questions: () => apiRequest<SingleResponse<PaginatedResponse<import("@/types/product").ProductQuestion>>>(API_ROUTES.ADMIN_QUESTIONS, { auth: true }).then((r) => r.data.data),
+  auditLogs: () => apiRequest<SingleResponse<PaginatedResponse<AuditLog>>>(API_ROUTES.ADMIN_AUDIT_LOGS, { auth: true }).then((r) => r.data.data),
   branches: () => apiRequest<PaginatedResponse<Branch>>(API_ROUTES.ADMIN_BRANCHES, { auth: true }).then((r) => r.data),
   staff: () => apiRequest<PaginatedResponse<StaffUser>>(API_ROUTES.ADMIN_STAFF, { auth: true }).then((r) => r.data),
+  reviews: () => apiRequest<{ success: boolean; data: PaginatedResponse<import("@/types/product").ProductReview> }>("/admin/reviews", { auth: true }).then((r) => r.data.data),
   store: () => apiRequest<SingleResponse<StoreSettings>>(API_ROUTES.STORE, { auth: true }).then((r) => r.data),
   salesReport: () => apiRequest<SingleResponse<SalesReport>>(API_ROUTES.ADMIN_SALES_REPORT, { auth: true }).then((r) => r.data),
   profitReport: () => apiRequest<SingleResponse<ProfitReport>>(API_ROUTES.ADMIN_PROFIT_REPORT, { auth: true }).then((r) => r.data),
@@ -101,6 +110,14 @@ export const adminService = {
 
   restockProduct(productId: number, payload: { quantity: number; note?: string }) {
     return apiRequest<SingleResponse<Product>>(`${API_ROUTES.ADMIN_PRODUCTS}/${productId}/restock`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  adjustInventory(payload: { product_id: number; product_variant_id?: number | null; quantity_change: number; type: string; note: string }) {
+    return apiRequest<SingleResponse<InventoryLog>>(API_ROUTES.ADMIN_INVENTORY_ADJUSTMENTS, {
       method: "POST",
       auth: true,
       body: JSON.stringify(payload),
@@ -245,6 +262,26 @@ export const adminService = {
     }).then((r) => r.data);
   },
 
+  refundOrder(orderId: number, reason?: string) {
+    return apiRequest<SingleResponse<Order>>(`/admin/orders/${orderId}/refund`, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ reason }),
+    }).then((r) => r.data);
+  },
+
+  updateReview(reviewId: number, status: "pending" | "approved" | "rejected") {
+    return apiRequest<SingleResponse<import("@/types/product").ProductReview>>(`/admin/reviews/${reviewId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify({ status }),
+    }).then((r) => r.data);
+  },
+
+  deleteReview(reviewId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`/admin/reviews/${reviewId}`, { method: "DELETE", auth: true });
+  },
+
   createBranch(payload: Record<string, unknown>) {
     return apiRequest<SingleResponse<Branch>>(API_ROUTES.ADMIN_BRANCHES, {
       method: "POST",
@@ -297,5 +334,81 @@ export const adminService = {
       auth: true,
       body: JSON.stringify(payload),
     }).then((r) => r.data);
+  },
+
+  createShippingMethod(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<ShippingMethod>>(API_ROUTES.ADMIN_SHIPPING_METHODS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  updateShippingMethod(methodId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<ShippingMethod>>(`${API_ROUTES.ADMIN_SHIPPING_METHODS}/${methodId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteShippingMethod(methodId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_SHIPPING_METHODS}/${methodId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+
+  createBanner(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<MarketingBanner>>(API_ROUTES.ADMIN_BANNERS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  updateBanner(bannerId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<MarketingBanner>>(`${API_ROUTES.ADMIN_BANNERS}/${bannerId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteBanner(bannerId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_BANNERS}/${bannerId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+
+  updateQuestion(questionId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<import("@/types/product").ProductQuestion>>(`${API_ROUTES.ADMIN_QUESTIONS}/${questionId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteQuestion(questionId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_QUESTIONS}/${questionId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+
+  updateNewsletterSubscriber(subscriberId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<NewsletterSubscriber>>(`${API_ROUTES.ADMIN_NEWSLETTER_SUBSCRIBERS}/${subscriberId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteNewsletterSubscriber(subscriberId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_NEWSLETTER_SUBSCRIBERS}/${subscriberId}`, {
+      method: "DELETE",
+      auth: true,
+    });
   },
 };

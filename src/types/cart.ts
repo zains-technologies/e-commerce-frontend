@@ -18,7 +18,7 @@ export interface CartTotals {
 
 export interface Cart {
   id?: number;
-  coupon?: string | null;
+  coupon?: { id: number; code: string; type: "percentage" | "fixed"; value: number } | string | null;
   items: CartItem[];
   totals: CartTotals;
 }
@@ -35,8 +35,11 @@ export interface CheckoutPayload {
   customer_email?: string;
   customer_phone?: string;
   delivery_address: string;
+  shipping_method?: "standard" | "express" | "pickup";
+  shipping_method_id?: number | null;
+  order_notes?: string;
   delivery_fee?: number;
+  tax_total?: number;
   payment_method?: "cod" | "bank_transfer" | "payhere";
   meta?: Record<string, unknown>;
 }
-

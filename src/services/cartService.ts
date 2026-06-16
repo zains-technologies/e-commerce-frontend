@@ -51,5 +51,21 @@ export const cartService = {
     });
     return response.data;
   },
-};
 
+  async applyCoupon(code: string) {
+    const response = await apiRequest<SingleResponse<Cart>>(API_ROUTES.CART_COUPON, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+      cart: true,
+    });
+    return response.data;
+  },
+
+  async removeCoupon() {
+    const response = await apiRequest<SingleResponse<Cart>>(API_ROUTES.CART_COUPON, {
+      method: "DELETE",
+      cart: true,
+    });
+    return response.data;
+  },
+};

@@ -23,8 +23,13 @@ import {
   Home,
   Layers3,
   LogOut,
+  Mail,
+  Megaphone,
+  MessageSquare,
   Package,
   Percent,
+  ScrollText,
+  Truck,
   RefreshCw,
   ShoppingBag,
   Store,
@@ -41,9 +46,10 @@ import { adminService } from "@/services/adminService";
 import { authService } from "@/services/authService";
 import type { Branch, Coupon, Order, Payment, StaffUser, StoreSettings } from "@/types/admin";
 import type { Category } from "@/types/category";
-import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductVariant, SizeGuide } from "@/types/product";
+import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductQuestion, ProductVariant, SizeGuide } from "@/types/product";
+import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
 
-const tabs = ["overview", "store", "products", "categories", "orders", "coupons", "reports", "payments", "inventory", "branches", "staff"] as const;
+const tabs = ["overview", "store", "products", "categories", "orders", "coupons", "reviews", "questions", "reports", "payments", "shipping", "marketing", "newsletter", "inventory", "branches", "staff", "audit"] as const;
 type Tab = (typeof tabs)[number];
 
 const tabLabels: Record<Tab, string> = {
@@ -53,11 +59,17 @@ const tabLabels: Record<Tab, string> = {
   categories: "Categories",
   orders: "Orders",
   coupons: "Coupons",
+  reviews: "Reviews",
+  questions: "Questions",
   reports: "Reports",
   payments: "Payments",
+  shipping: "Shipping",
+  marketing: "Marketing",
+  newsletter: "Newsletter",
   inventory: "Inventory",
   branches: "Branches",
   staff: "Staff",
+  audit: "Audit Logs",
 };
 
 const tabHref: Record<Tab, string> = {
@@ -67,11 +79,17 @@ const tabHref: Record<Tab, string> = {
   categories: "/admin/categories",
   orders: "/admin/orders",
   coupons: "/admin/coupons",
+  reviews: "/admin/reviews",
+  questions: "/admin/questions",
   reports: "/admin/reports",
   payments: "/admin/payments",
+  shipping: "/admin/shipping",
+  marketing: "/admin/marketing",
+  newsletter: "/admin/newsletter",
   inventory: "/admin/inventory",
   branches: "/admin/branches",
   staff: "/admin/staff",
+  audit: "/admin/audit",
 };
 
 const tabIcons: Record<Tab, ReactNode> = {
@@ -81,11 +99,17 @@ const tabIcons: Record<Tab, ReactNode> = {
   categories: <FolderTree className="size-4" />,
   orders: <ShoppingBag className="size-4" />,
   coupons: <Percent className="size-4" />,
+  reviews: <MessageSquare className="size-4" />,
+  questions: <MessageSquare className="size-4" />,
   reports: <ChartNoAxesCombined className="size-4" />,
   payments: <CreditCard className="size-4" />,
+  shipping: <Truck className="size-4" />,
+  marketing: <Megaphone className="size-4" />,
+  newsletter: <Mail className="size-4" />,
   inventory: <Layers3 className="size-4" />,
   branches: <Building2 className="size-4" />,
   staff: <Users className="size-4" />,
+  audit: <ScrollText className="size-4" />,
 };
 
 const tabDescriptions: Record<Tab, string> = {
@@ -95,11 +119,17 @@ const tabDescriptions: Record<Tab, string> = {
   categories: "Category structure and storefront browsing.",
   orders: "Fulfillment, statuses, and customer order activity.",
   coupons: "Discount campaigns for mid and pro stores.",
+  reviews: "Approve, reject, and moderate customer product reviews.",
+  questions: "Answer product questions before showing them publicly.",
   reports: "Sales, profit, and best-selling product insights.",
   payments: "COD, bank transfer, and payment status review.",
+  shipping: "Delivery methods and customer checkout fees.",
+  marketing: "Storefront banners, hero content, and promotional notices.",
+  newsletter: "Newsletter subscribers and subscription health.",
   inventory: "Low-stock monitoring and inventory movement logs.",
   branches: "Multi-branch configuration for pro stores.",
   staff: "Admin, manager, and staff user access.",
+  audit: "Admin activity and platform change history.",
 };
 
 type ProductDraft = {
@@ -130,9 +160,12 @@ type CategoryDraft = {
   id?: number;
   is_parent: boolean;
   parent_id: string;
+  sort_order: string;
   name: string;
   slug: string;
   description: string;
+  image_path: string;
+  banner_path: string;
   is_active: boolean;
 };
 
@@ -161,6 +194,7 @@ type StaffDraft = {
   email: string;
   phone: string;
   role: "admin" | "manager" | "staff";
+  permissions: string[];
   password: string;
 };
 
@@ -193,7 +227,9 @@ type StoreDraft = {
 
 type RestockDraft = {
   product?: Product;
+  variant_id: string;
   quantity: string;
+  type: "restock" | "adjustment" | "damage" | "return";
   note: string;
 };
 
@@ -202,6 +238,30 @@ type CatalogQuickDraft = {
   tag: string;
   collection: string;
   sizeGuide: string;
+};
+
+type ShippingDraft = {
+  id?: number;
+  name: string;
+  code: string;
+  description: string;
+  fee: string;
+  min_order_total: string;
+  sort_order: string;
+  is_active: boolean;
+};
+
+type BannerDraft = {
+  id?: number;
+  title: string;
+  subtitle: string;
+  image_url: string;
+  link_url: string;
+  position: string;
+  starts_at: string;
+  ends_at: string;
+  sort_order: string;
+  is_active: boolean;
 };
 
 const emptyProduct: ProductDraft = {
@@ -226,20 +286,26 @@ const emptyProduct: ProductDraft = {
   specifications_text: "",
   variants_text: "",
 };
-const emptyCategory: CategoryDraft = { is_parent: true, parent_id: "", name: "", slug: "", description: "", is_active: true };
+const emptyCategory: CategoryDraft = { is_parent: true, parent_id: "", sort_order: "0", name: "", slug: "", description: "", image_path: "", banner_path: "", is_active: true };
 const emptyCoupon: CouponDraft = { code: "", type: "percentage", value: "10", starts_at: "", ends_at: "", usage_limit: "50", is_active: true };
 const emptyBranch: BranchDraft = { name: "", phone: "", address: "", is_active: true };
-const emptyStaff: StaffDraft = { name: "", email: "", phone: "", role: "staff", password: "password" };
+const emptyStaff: StaffDraft = { name: "", email: "", phone: "", role: "staff", permissions: ["products.view", "orders.view"], password: "password" };
 const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", currency: "LKR", domain: "localhost", custom_domain: "", plan: "simple", primary: "#111111", secondary: "#d8dfcc", accent: "#ef4444", delivery_fee: "0", notice_enabled: false, notice_message: "", notice_coupon_code: "", notice_href: "/products" };
-const emptyRestock: RestockDraft = { quantity: "10", note: "Manual restock from admin panel" };
+const emptyRestock: RestockDraft = { variant_id: "", quantity: "10", type: "restock", note: "Manual restock from admin panel" };
 const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", sizeGuide: "" };
+const emptyShipping: ShippingDraft = { name: "", code: "", description: "", fee: "0", min_order_total: "", sort_order: "0", is_active: true };
+const emptyBanner: BannerDraft = { title: "", subtitle: "", image_url: "", link_url: "/products", position: "home_hero", starts_at: "", ends_at: "", sort_order: "0", is_active: true };
 const planOptions = [{ label: "Simple", value: "simple" }, { label: "Mid", value: "mid" }, { label: "Pro", value: "pro" }];
 const productStatusOptions = [{ label: "Active", value: "active" }, { label: "Inactive", value: "inactive" }, { label: "Draft", value: "draft" }];
 const couponTypeOptions = [{ label: "Percentage", value: "percentage" }, { label: "Fixed", value: "fixed" }];
 const orderStatusOptions = ["pending", "paid", "processing", "shipped", "delivered", "cancelled"].map((status) => ({ label: titleCase(status), value: status }));
 const paymentStatusOptions = ["pending", "paid", "failed", "refunded"].map((status) => ({ label: titleCase(status), value: status }));
 const staffRoleOptions = [{ label: "Admin", value: "admin" }, { label: "Manager", value: "manager" }, { label: "Staff", value: "staff" }];
+const inventoryTypeOptions = ["restock", "adjustment", "damage", "return"].map((value) => ({ label: titleCase(value), value }));
+const staffPermissionOptions = ["products.view", "products.update", "orders.view", "orders.update", "reports.view", "inventory.update"].map((value) => ({ label: value, value }));
 const pageSizeOptions = [12, 24, 48].map((size) => ({ label: String(size), value: String(size) }));
+const bannerPositionOptions = ["home_hero", "promo", "notice", "category", "product"].map((value) => ({ label: titleCase(value), value }));
+const subscriberStatusOptions = ["subscribed", "unsubscribed", "bounced"].map((value) => ({ label: titleCase(value), value }));
 
 export default function AdminPage() {
   return <AdminShell initialTab="overview" />;
@@ -435,12 +501,32 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
                 <CouponPanel coupons={data.coupons} busy={busy} run={run} />
               )}
 
+              {tab === "reviews" && (
+                <ReviewsPanel reviews={data.reviews || []} busy={busy} run={run} />
+              )}
+
+              {tab === "questions" && (
+                <QuestionsPanel questions={data.questions || []} busy={busy} run={run} />
+              )}
+
               {tab === "reports" && (
                 <ReportsPanel data={data} />
               )}
 
               {tab === "payments" && (
                 <PaymentsPanel payments={data.payments} busy={busy} run={run} />
+              )}
+
+              {tab === "shipping" && (
+                <ShippingPanel methods={data.shippingMethods || []} busy={busy} run={run} />
+              )}
+
+              {tab === "marketing" && (
+                <MarketingPanel banners={data.marketingBanners || []} busy={busy} run={run} />
+              )}
+
+              {tab === "newsletter" && (
+                <NewsletterPanel subscribers={data.newsletterSubscribers || []} busy={busy} run={run} />
               )}
 
               {tab === "inventory" && (
@@ -453,6 +539,10 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
 
               {tab === "staff" && (
                 <StaffPanel staff={data.staff} busy={busy} run={run} />
+              )}
+
+              {tab === "audit" && (
+                <AuditPanel logs={data.auditLogs || []} />
               )}
             </>
           )}
@@ -992,14 +1082,15 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
         </div>
       </div>
 
-      <AdminTable columns={["Image", "Name", "Category", "Brand", "Price", "Stock", "Status", "Actions"]} rows={paginatedProducts.map((product) => [
+      <AdminTable columns={["Image", "Name", "Category", "Brand", "Price", "Stock", "Status", "Date", "Actions"]} rows={paginatedProducts.map((product) => [
         <img key="img" src={getPrimaryImage(product.images)} alt={product.name} className="size-16 rounded-2xl object-cover" />,
         <span key="name"><strong>{product.name}</strong><br /><small className="text-neutral-500">{product.sku || product.slug}</small></span>,
         product.category?.name || "-",
         product.brand?.name || "-",
         formatCurrency(product.price),
         <span key="stock" className={product.low_stock || product.stock_quantity <= 10 ? "font-bold text-red-600" : ""}>{product.stock_quantity}</span>,
-        product.status || "active",
+        <StatusBadge key="status" status={product.status || "active"} />,
+        <DateCell key="date" value={product.created_at} />,
         <ActionButtons key="actions" busy={busy} onEdit={() => edit(product)} onDelete={() => run(() => adminService.deleteProduct(product.id), "Product deleted.")} />,
       ])} />
     </AdminCard>
@@ -1123,7 +1214,18 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
   const selectedParent = categories.find((category) => String(category.id) === draft.parent_id);
 
   function edit(category: Category) {
-    setDraft({ id: category.id, is_parent: Boolean(category.show_in_header), parent_id: category.parent_id ? String(category.parent_id) : "", name: category.name, slug: category.slug, description: category.description || "", is_active: Boolean(category.is_active) });
+    setDraft({
+      id: category.id,
+      is_parent: Boolean(category.show_in_header),
+      parent_id: category.parent_id ? String(category.parent_id) : "",
+      sort_order: String(category.sort_order || 0),
+      name: category.name,
+      slug: category.slug,
+      description: category.description || "",
+      image_path: category.image_url || "",
+      banner_path: category.banner_url || "",
+      is_active: Boolean(category.is_active),
+    });
     setDrawerOpen(true);
   }
 
@@ -1132,7 +1234,17 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
     if (!draft.is_parent && !draft.parent_id) {
       return;
     }
-    const payload = { parent_id: draft.is_parent ? null : Number(draft.parent_id), show_in_header: draft.is_parent, name: draft.name, slug: draft.slug, description: draft.description, is_active: draft.is_active };
+    const payload = {
+      parent_id: draft.is_parent ? null : Number(draft.parent_id),
+      show_in_header: draft.is_parent,
+      sort_order: Number(draft.sort_order || 0),
+      name: draft.name,
+      slug: draft.slug,
+      description: draft.description,
+      image_path: draft.image_path,
+      banner_path: draft.banner_path,
+      is_active: draft.is_active,
+    };
     await run(() => editing && draft.id ? adminService.updateCategory(draft.id, payload) : adminService.createCategory(payload), editing ? "Category updated." : "Category created.");
     setDraft(emptyCategory);
     setDrawerOpen(false);
@@ -1172,7 +1284,10 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
           onChange={(e) => setDraft({ ...draft, name: e.target.value, slug: draft.slug || slugify(e.target.value) })}
         />
         <Input required placeholder="Slug" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
+        <Input placeholder="Menu order, e.g. 10" type="number" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
         <Input placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <Input placeholder="Category image URL" value={draft.image_path} onChange={(e) => setDraft({ ...draft, image_path: e.target.value })} />
+        <Input placeholder="Category banner URL" value={draft.banner_path} onChange={(e) => setDraft({ ...draft, banner_path: e.target.value })} />
         <div className="rounded-[22px] bg-neutral-50 p-4 text-sm text-neutral-600">
           {draft.is_parent
             ? "This will appear as a main item on the storefront header."
@@ -1189,15 +1304,17 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
         </div>
       </form>
       </Drawer>
-      <AdminTable columns={["Name", "Path", "Header", "Slug", "Status", "Actions"]} rows={categories.map((category) => [
+      <AdminTable columns={["Name", "Path", "Order", "Header", "Slug", "Status", "Date", "Actions"]} rows={categories.map((category) => [
         <span key="name" className={cn("block", category.parent_id && "pl-5")}>
           <strong>{category.parent_id ? `↳ ${category.name}` : category.name}</strong>
           {category.children?.length ? <small className="ml-2 text-neutral-500">({category.children.length} dropdown items)</small> : null}
         </span>,
         categoryPath(category, categories),
-        category.show_in_header ? "Shown" : "-",
+        category.sort_order ?? 0,
+        category.show_in_header ? <StatusBadge key="header" status="shown" /> : "-",
         category.slug,
-        category.is_active ? "Active" : "Inactive",
+        <StatusBadge key="status" status={category.is_active ? "active" : "inactive"} />,
+        <DateCell key="date" value={category.created_at} />,
         <ActionButtons key="actions" busy={busy} onEdit={() => edit(category)} onDelete={() => run(() => adminService.deleteCategory(category.id), "Category deleted.")} />,
       ])} />
     </AdminCard>
@@ -1205,15 +1322,116 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
 }
 
 function OrderPanel({ orders, busy, run }: { orders: Order[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [selected, setSelected] = useState<Order | null>(null);
+
   return (
     <AdminCard>
       <PanelTitle title="Order management" subtitle="Update order, payment, delivery status, and tracking numbers." />
       <OrderTable orders={orders} action={(order) => (
         <div className="grid gap-2">
+          <Button className="h-8 px-3" variant="outline" onClick={() => setSelected(order)}>Details</Button>
           <Dropdown size="sm" disabled={busy} value={order.status} options={orderStatusOptions} onChange={(value) => run(() => adminService.updateOrderStatus(order.id, { status: value, payment_status: order.payment_status }), "Order status updated.")} />
           <Button className="h-8 px-3" disabled={busy} onClick={() => run(() => adminService.updateOrderStatus(order.id, { status: "delivered", payment_status: "paid", delivery_status: "delivered" }), "Order marked delivered and paid.")}>Complete</Button>
         </div>
       )} />
+      <Drawer open={Boolean(selected)} title={selected?.order_number || "Order detail"} subtitle="Customer, items, delivery timeline, invoice, and refund controls." onClose={() => setSelected(null)}>
+        {selected && (
+          <div className="grid gap-4">
+            <div className="rounded-[24px] bg-neutral-50 p-4 text-sm">
+              <p className="font-black">{selected.customer.name}</p>
+              <p className="text-neutral-500">{selected.customer.email || "-"} · {selected.customer.phone || "-"}</p>
+              <p className="mt-3">{selected.delivery_address}</p>
+              {selected.order_notes && <p className="mt-2 text-neutral-500">Note: {selected.order_notes}</p>}
+            </div>
+            <div className="grid gap-2">
+              {(selected.timeline || []).map((step) => (
+                <div key={step.label} className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm">
+                  <span className="font-bold">{step.label}</span>
+                  <span className="text-neutral-500">{step.status}</span>
+                </div>
+              ))}
+            </div>
+            <AdminTable columns={["Item", "Qty", "Total"]} rows={(selected.items || []).map((item) => [item.product_name, item.quantity, formatCurrency(item.line_total)])} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => printInvoice(selected)}>Print invoice</Button>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => run(() => adminService.refundOrder(selected.id, "Manual admin refund"), "Order refunded.")}>Refund</Button>
+            </div>
+          </div>
+        )}
+      </Drawer>
+    </AdminCard>
+  );
+}
+
+function ReviewsPanel({ reviews, busy, run }: { reviews: NonNullable<ReturnType<typeof useAdmin>["data"]["reviews"]>; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  return (
+    <AdminCard>
+      <PanelTitle title="Review moderation" subtitle="Approve useful reviews, reject spam, and remove unwanted entries." />
+      <AdminTable columns={["Product", "Customer", "Rating", "Comment", "Status", "Date", "Actions"]} rows={reviews.map((review) => [
+        review.product?.name || "-",
+        review.customer_name,
+        `★ ${review.rating}`,
+        review.comment || "-",
+        <StatusBadge key="status" status={review.status || "pending"} />,
+        <DateCell key="date" value={review.created_at} />,
+        <div key="actions" className="flex flex-wrap gap-2">
+          <Button className="h-8 px-3" disabled={busy} onClick={() => run(() => adminService.updateReview(review.id, "approved"), "Review approved.")}>Approve</Button>
+          <Button className="h-8 px-3" variant="outline" disabled={busy} onClick={() => run(() => adminService.updateReview(review.id, "rejected"), "Review rejected.")}>Reject</Button>
+          <Button className="h-8 px-3" variant="outline" disabled={busy} onClick={() => run(() => adminService.deleteReview(review.id), "Review deleted.")}>Delete</Button>
+        </div>,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function QuestionsPanel({ questions, busy, run }: { questions: ProductQuestion[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [selected, setSelected] = useState<ProductQuestion | null>(null);
+  const [answer, setAnswer] = useState("");
+
+  function open(question: ProductQuestion) {
+    setSelected(question);
+    setAnswer(question.answer || "");
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    await run(() => adminService.updateQuestion(selected.id, { answer, status: "answered" }), "Question answered.");
+    setSelected(null);
+    setAnswer("");
+  }
+
+  return (
+    <AdminCard>
+      <PanelTitle title="Product questions" subtitle="Answer customer questions. Answered questions can appear on product detail pages." />
+      <AdminTable columns={["Product", "Customer", "Question", "Answer", "Status", "Date", "Actions"]} rows={questions.map((question) => [
+        question.product?.name || "-",
+        question.customer_name,
+        question.question,
+        question.answer || "-",
+        <StatusBadge key="status" status={question.status || "pending"} />,
+        <DateCell key="date" value={question.created_at} />,
+        <div key="actions" className="flex flex-wrap gap-2">
+          <Button className="h-8 px-3" disabled={busy} onClick={() => open(question)}>Answer</Button>
+          <Button className="h-8 px-3" variant="outline" disabled={busy} onClick={() => run(() => adminService.updateQuestion(question.id, { answer: question.answer || "", status: "rejected" }), "Question rejected.")}>Reject</Button>
+          <Button className="h-8 px-3" variant="outline" disabled={busy} onClick={() => run(() => adminService.deleteQuestion(question.id), "Question deleted.")}>Delete</Button>
+        </div>,
+      ])} />
+      <Drawer open={Boolean(selected)} title="Answer question" subtitle={selected?.product?.name || "Product question"} onClose={() => setSelected(null)}>
+        {selected && (
+          <form onSubmit={submit} className="grid gap-3">
+            <div className="rounded-[24px] bg-neutral-50 p-4">
+              <p className="text-xs font-bold uppercase text-neutral-500">Customer question</p>
+              <p className="mt-2 text-sm leading-6">{selected.question}</p>
+            </div>
+            <textarea required className="min-h-36 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="Answer" value={answer} onChange={(event) => setAnswer(event.target.value)} />
+            <div className="flex gap-2">
+              <Button disabled={busy}>{busy ? "Saving..." : "Publish answer"}</Button>
+              <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
+            </div>
+          </form>
+        )}
+      </Drawer>
     </AdminCard>
   );
 }
@@ -1254,13 +1472,174 @@ function CouponPanel({ coupons, busy, run }: { coupons: Coupon[]; busy: boolean;
         <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update coupon" : "Create coupon"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
       </form>
       </Drawer>
-      <AdminTable columns={["Code", "Type", "Value", "Used", "Status", "Actions"]} rows={coupons.map((coupon) => [
+      <AdminTable columns={["Code", "Type", "Value", "Used", "Status", "Date", "Actions"]} rows={coupons.map((coupon) => [
         coupon.code,
         coupon.type,
         coupon.type === "percentage" ? `${coupon.value}%` : formatCurrency(coupon.value),
         `${coupon.used_count || 0}/${coupon.usage_limit || "∞"}`,
-        coupon.is_active ? "Active" : "Inactive",
+        <StatusBadge key="status" status={coupon.is_active ? "active" : "inactive"} />,
+        <DateCell key="date" value={coupon.created_at} />,
         <ActionButtons key="actions" busy={busy} onEdit={() => edit(coupon)} onDelete={() => run(() => adminService.deleteCoupon(coupon.id), "Coupon deleted.")} />,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [draft, setDraft] = useState<ShippingDraft>(emptyShipping);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const editing = Boolean(draft.id);
+
+  function edit(method: ShippingMethod) {
+    setDraft({
+      id: method.id,
+      name: method.name,
+      code: method.code,
+      description: method.description || "",
+      fee: String(method.fee),
+      min_order_total: method.min_order_total ? String(method.min_order_total) : "",
+      sort_order: String(method.sort_order || 0),
+      is_active: method.is_active,
+    });
+    setDrawerOpen(true);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const payload = shippingPayload(draft);
+    await run(() => editing && draft.id ? adminService.updateShippingMethod(draft.id, payload) : adminService.createShippingMethod(payload), editing ? "Shipping method updated." : "Shipping method created.");
+    setDraft(emptyShipping);
+    setDrawerOpen(false);
+  }
+
+  return (
+    <AdminCard>
+      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <PanelTitle title="Shipping methods" subtitle="These options appear in checkout and control delivery fees." />
+        <Button type="button" onClick={() => { setDraft(emptyShipping); setDrawerOpen(true); }}>Add method</Button>
+      </div>
+      <Drawer open={drawerOpen} title={editing ? "Edit shipping method" : "Add shipping method"} subtitle="Use codes like standard, express, or pickup for frontend clarity." onClose={() => setDrawerOpen(false)}>
+        <form onSubmit={submit} className="grid gap-3">
+          <Input required placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value, code: draft.code || slugify(e.target.value) })} />
+          <Input placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
+          <Input placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input required type="number" placeholder="Fee" value={draft.fee} onChange={(e) => setDraft({ ...draft, fee: e.target.value })} />
+            <Input type="number" placeholder="Min order total" value={draft.min_order_total} onChange={(e) => setDraft({ ...draft, min_order_total: e.target.value })} />
+            <Input type="number" placeholder="Sort order" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+          </div>
+          <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
+          <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update method" : "Create method"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
+        </form>
+      </Drawer>
+      <AdminTable columns={["Name", "Code", "Fee", "Minimum", "Order", "Status", "Actions"]} rows={methods.map((method) => [
+        method.name,
+        method.code,
+        formatCurrency(Number(method.fee)),
+        method.min_order_total ? formatCurrency(Number(method.min_order_total)) : "-",
+        method.sort_order || 0,
+        <StatusBadge key="status" status={method.is_active ? "active" : "inactive"} />,
+        <ActionButtons key="actions" busy={busy} onEdit={() => edit(method)} onDelete={() => run(() => adminService.deleteShippingMethod(method.id), "Shipping method deleted.")} />,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function MarketingPanel({ banners, busy, run }: { banners: MarketingBanner[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [draft, setDraft] = useState<BannerDraft>(emptyBanner);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const editing = Boolean(draft.id);
+
+  function edit(banner: MarketingBanner) {
+    setDraft({
+      id: banner.id,
+      title: banner.title,
+      subtitle: banner.subtitle || "",
+      image_url: banner.image_url || "",
+      link_url: banner.link_url || "",
+      position: banner.position,
+      starts_at: datetimeLocal(banner.starts_at),
+      ends_at: datetimeLocal(banner.ends_at),
+      sort_order: String(banner.sort_order || 0),
+      is_active: banner.is_active,
+    });
+    setDrawerOpen(true);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const payload = bannerPayload(draft);
+    await run(() => editing && draft.id ? adminService.updateBanner(draft.id, payload) : adminService.createBanner(payload), editing ? "Banner updated." : "Banner created.");
+    setDraft(emptyBanner);
+    setDrawerOpen(false);
+  }
+
+  return (
+    <AdminCard>
+      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <PanelTitle title="Marketing banners" subtitle="Control hero images, promo panels, and customer notice banners from the backend." />
+        <Button type="button" onClick={() => { setDraft(emptyBanner); setDrawerOpen(true); }}>Add banner</Button>
+      </div>
+      <Drawer open={drawerOpen} title={editing ? "Edit banner" : "Add banner"} subtitle="Positions like home_hero and promo are already wired into the storefront." onClose={() => setDrawerOpen(false)}>
+        <form onSubmit={submit} className="grid gap-3">
+          <Dropdown value={draft.position} options={bannerPositionOptions} onChange={(value) => setDraft({ ...draft, position: value })} />
+          <Input required placeholder="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <Input placeholder="Subtitle" value={draft.subtitle} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} />
+          <Input placeholder="Image URL" value={draft.image_url} onChange={(e) => setDraft({ ...draft, image_url: e.target.value })} />
+          <Input placeholder="Link URL" value={draft.link_url} onChange={(e) => setDraft({ ...draft, link_url: e.target.value })} />
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input type="datetime-local" placeholder="Starts at" value={draft.starts_at} onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })} />
+            <Input type="datetime-local" placeholder="Ends at" value={draft.ends_at} onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })} />
+            <Input type="number" placeholder="Sort order" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+          </div>
+          <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
+          {draft.image_url && <img src={draft.image_url} alt={draft.title || "Banner preview"} className="aspect-[2.4] rounded-[24px] object-cover" />}
+          <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update banner" : "Create banner"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
+        </form>
+      </Drawer>
+      <AdminTable columns={["Preview", "Title", "Position", "Window", "Order", "Status", "Date", "Actions"]} rows={banners.map((banner) => [
+        banner.image_url ? <img key="img" src={banner.image_url} alt={banner.title} className="size-16 rounded-2xl object-cover" /> : "-",
+        <span key="title"><strong>{banner.title}</strong><br /><small className="text-neutral-500">{banner.subtitle || banner.link_url || "-"}</small></span>,
+        banner.position,
+        `${dateOnly(banner.starts_at) || "Now"} - ${dateOnly(banner.ends_at) || "Open"}`,
+        banner.sort_order || 0,
+        <StatusBadge key="status" status={banner.is_active ? "active" : "inactive"} />,
+        <DateCell key="date" value={banner.created_at} />,
+        <ActionButtons key="actions" busy={busy} onEdit={() => edit(banner)} onDelete={() => run(() => adminService.deleteBanner(banner.id), "Banner deleted.")} />,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function NewsletterPanel({ subscribers, busy, run }: { subscribers: NewsletterSubscriber[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  return (
+    <AdminCard>
+      <PanelTitle title="Newsletter subscribers" subtitle="People who subscribed from the storefront footer." />
+      <AdminTable columns={["Email", "Name", "Status", "Subscribed", "Date", "Actions"]} rows={subscribers.map((subscriber) => [
+        subscriber.email,
+        subscriber.name || "-",
+        <StatusBadge key="status" status={subscriber.status} />,
+        <DateCell key="subscribed" value={subscriber.subscribed_at} />,
+        <DateCell key="date" value={subscriber.created_at} />,
+        <div key="actions" className="flex flex-wrap gap-2">
+          <Dropdown size="sm" disabled={busy} value={subscriber.status} options={subscriberStatusOptions} onChange={(value) => run(() => adminService.updateNewsletterSubscriber(subscriber.id, { status: value }), "Subscriber updated.")} />
+          <Button className="h-8 px-3" variant="outline" disabled={busy} onClick={() => run(() => adminService.deleteNewsletterSubscriber(subscriber.id), "Subscriber deleted.")}>Delete</Button>
+        </div>,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function AuditPanel({ logs }: { logs: NonNullable<ReturnType<typeof useAdmin>["data"]["auditLogs"]> }) {
+  return (
+    <AdminCard>
+      <PanelTitle title="Audit logs" subtitle="Recent admin and platform activity for operational traceability." />
+      <AdminTable columns={["Action", "User", "Subject", "Description", "Date"]} rows={logs.map((log) => [
+        <StatusBadge key="action" status={log.action} />,
+        log.user?.name || "System",
+        [log.subject_type, log.subject_id].filter(Boolean).join(" #") || "-",
+        log.description || "-",
+        <DateCell key="date" value={log.created_at} />,
       ])} />
     </AdminCard>
   );
@@ -1288,6 +1667,20 @@ function ReportsPanel({ data }: { data: ReturnType<typeof useAdmin>["data"] }) {
         </div>
         <AdminTable columns={["Product", "Quantity", "Revenue"]} rows={(data.salesReport?.best_selling_products || []).map((item) => [item.product_name, item.quantity_sold, formatCurrency(item.revenue)])} />
       </AdminCard>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AdminCard>
+          <PanelTitle title="Sales by category" subtitle="Revenue by catalog group." />
+          <AdminTable columns={["Category", "Qty", "Revenue"]} rows={(data.salesReport?.sales_by_category || []).map((item) => [item.category_name, item.quantity_sold, formatCurrency(item.revenue)])} />
+        </AdminCard>
+        <AdminCard>
+          <PanelTitle title="Payment methods" subtitle="Orders and revenue by payment type." />
+          <AdminTable columns={["Method", "Orders", "Revenue"]} rows={(data.salesReport?.sales_by_payment_method || []).map((item) => [item.payment_method, item.orders, formatCurrency(item.revenue)])} />
+        </AdminCard>
+        <AdminCard>
+          <PanelTitle title="Customer report" subtitle="Top customers by revenue." />
+          <AdminTable columns={["Customer", "Orders", "Revenue"]} rows={(data.salesReport?.customer_report || []).map((item) => [item.customer_name || item.customer_email || "-", item.orders, formatCurrency(item.revenue)])} />
+        </AdminCard>
+      </div>
     </div>
   );
 }
@@ -1296,12 +1689,13 @@ function PaymentsPanel({ payments, busy, run }: { payments: Payment[]; busy: boo
   return (
     <AdminCard>
       <PanelTitle title="Payment updates" subtitle="Mark manual/bank transfer payments paid, failed, pending, or refunded." />
-      <AdminTable columns={["Order", "Method", "Status", "Amount", "Transaction", "Action"]} rows={payments.map((payment) => [
+      <AdminTable columns={["Order", "Method", "Status", "Amount", "Transaction", "Date", "Action"]} rows={payments.map((payment) => [
         payment.order_number || payment.order_id,
         payment.method,
-        payment.status,
+        <StatusBadge key="status" status={payment.status} />,
         formatCurrency(payment.amount),
         payment.transaction_id || "-",
+        <DateCell key="date" value={payment.paid_at || payment.created_at} />,
         <Dropdown key="status" size="sm" disabled={busy} value={payment.status} options={paymentStatusOptions} onChange={(value) => run(() => adminService.updatePayment(payment.id, { status: value, transaction_id: payment.transaction_id || `MANUAL-${payment.id}` }), "Payment updated.")} />,
       ])} />
     </AdminCard>
@@ -1314,14 +1708,22 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
   const [draft, setDraft] = useState<RestockDraft>(emptyRestock);
 
   function openRestock(product: Product) {
-    setDraft({ product, quantity: "10", note: `Restock ${product.name}` });
+    setDraft({ product, variant_id: "", quantity: "10", type: "restock", note: `Restock ${product.name}` });
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.product) return;
-    await run(() => adminService.restockProduct(draft.product!.id, { quantity: Number(draft.quantity), note: draft.note }), "Product restocked.");
+    const quantity = Math.abs(Number(draft.quantity));
+    const quantityChange = draft.type === "damage" ? -quantity : quantity;
+    await run(() => adminService.adjustInventory({
+      product_id: draft.product!.id,
+      product_variant_id: draft.variant_id ? Number(draft.variant_id) : null,
+      quantity_change: quantityChange,
+      type: draft.type,
+      note: draft.note,
+    }), "Inventory updated.");
     setDraft(emptyRestock);
     setDrawerOpen(false);
   }
@@ -1330,19 +1732,20 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
     <div className="grid gap-4">
       <AdminCard>
         <PanelTitle title="Low stock flags" subtitle="Products at or below the low-stock threshold." />
-        <AdminTable columns={["Image", "Product", "SKU", "Stock", "Action"]} rows={lowStock.map((product) => [
+        <AdminTable columns={["Image", "Product", "SKU", "Stock", "Date", "Action"]} rows={lowStock.map((product) => [
           <img key="img" src={getPrimaryImage(product.images)} alt={product.name} className="size-14 rounded-2xl object-cover" />,
           product.name,
           product.sku || "-",
           <span key="stock" className="font-bold text-red-600">{product.stock_quantity}</span>,
-          <Button key="restock" type="button" className="h-8 px-3" onClick={() => openRestock(product)}>Restock</Button>,
+          <DateCell key="date" value={product.updated_at || product.created_at} />,
+          <Button key="restock" type="button" className="h-8 px-3" onClick={() => openRestock(product)}>Adjust</Button>,
         ])} />
       </AdminCard>
       <AdminCard>
         <PanelTitle title="Inventory logs" subtitle="Stock changes generated by orders and adjustments." />
-        <AdminTable columns={["Type", "Product", "Change", "Stock After", "Note"]} rows={logs.map((log) => [log.type, log.product_id, log.quantity_change, log.stock_after, log.note || "-"])} />
+        <AdminTable columns={["Type", "Product", "Change", "Stock After", "Note", "Date"]} rows={logs.map((log) => [<StatusBadge key="type" status={log.type} />, log.product_id, log.quantity_change, log.stock_after, log.note || "-", <DateCell key="date" value={log.created_at} />])} />
       </AdminCard>
-      <Drawer open={drawerOpen} title="Restock product" subtitle="Add new stock and keep an inventory audit trail." onClose={() => setDrawerOpen(false)}>
+      <Drawer open={drawerOpen} title="Inventory adjustment" subtitle="Restock, correct counts, or log damaged/returned stock with a reason." onClose={() => setDrawerOpen(false)}>
         <form onSubmit={submit} className="grid gap-3">
           {draft.product && (
             <div className="rounded-[24px] bg-neutral-50 p-4">
@@ -1351,10 +1754,19 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
               <p className="text-sm text-neutral-500">Current stock: {draft.product.stock_quantity}</p>
             </div>
           )}
-          <Input required min={1} type="number" placeholder="Quantity to add" value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} />
-          <Input placeholder="Restock note" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          {draft.product?.variants?.length ? (
+            <Dropdown
+              value={draft.variant_id}
+              placeholder="Whole product stock"
+              options={[{ label: "Whole product stock", value: "" }, ...draft.product.variants.map((variant) => ({ label: `${variant.attribute_name}: ${variant.attribute_value} (${variant.stock_quantity})`, value: String(variant.id) }))]}
+              onChange={(value) => setDraft({ ...draft, variant_id: value })}
+            />
+          ) : null}
+          <Dropdown value={draft.type} options={inventoryTypeOptions} onChange={(value) => setDraft({ ...draft, type: value as RestockDraft["type"] })} />
+          <Input required min={1} type="number" placeholder="Quantity" value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} />
+          <Input required placeholder="Reason note" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
           <div className="flex gap-2">
-            <Button disabled={busy}>{busy ? "Saving..." : "Confirm restock"}</Button>
+            <Button disabled={busy}>{busy ? "Saving..." : "Save adjustment"}</Button>
             <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
           </div>
         </form>
@@ -1395,7 +1807,7 @@ function BranchPanel({ branches, busy, run }: { branches: Branch[]; busy: boolea
         <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update branch" : "Create branch"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
       </form>
       </Drawer>
-      <AdminTable columns={["Name", "Phone", "Address", "Status", "Actions"]} rows={branches.map((branch) => [branch.name, branch.phone || "-", branch.address || "-", branch.is_active ? "Active" : "Inactive", <ActionButtons key="actions" busy={busy} onEdit={() => edit(branch)} onDelete={() => run(() => adminService.deleteBranch(branch.id), "Branch deleted.")} />])} />
+      <AdminTable columns={["Name", "Phone", "Address", "Status", "Date", "Actions"]} rows={branches.map((branch) => [branch.name, branch.phone || "-", branch.address || "-", <StatusBadge key="status" status={branch.is_active ? "active" : "inactive"} />, <DateCell key="date" value={branch.created_at} />, <ActionButtons key="actions" busy={busy} onEdit={() => edit(branch)} onDelete={() => run(() => adminService.deleteBranch(branch.id), "Branch deleted.")} />])} />
     </AdminCard>
   );
 }
@@ -1406,7 +1818,7 @@ function StaffPanel({ staff, busy, run }: { staff: StaffUser[]; busy: boolean; r
   const editing = Boolean(draft.id);
 
   function edit(user: StaffUser) {
-    setDraft({ id: user.id, name: user.name, email: user.email, phone: user.phone || "", role: user.role, password: "" });
+    setDraft({ id: user.id, name: user.name, email: user.email, phone: user.phone || "", role: user.role, permissions: user.permissions || [], password: "" });
     setDrawerOpen(true);
   }
 
@@ -1431,23 +1843,44 @@ function StaffPanel({ staff, busy, run }: { staff: StaffUser[]; busy: boolean; r
         <Input required placeholder="Email" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
         <Input placeholder="Phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
         <Dropdown value={draft.role} options={staffRoleOptions} onChange={(value) => setDraft({ ...draft, role: value as StaffDraft["role"] })} />
+        <div className="rounded-[24px] border border-neutral-200 p-4">
+          <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Permissions</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {staffPermissionOptions.map((permission) => (
+              <label key={permission.value} className="flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.permissions.includes(permission.value)}
+                  onChange={(event) => setDraft({
+                    ...draft,
+                    permissions: event.target.checked
+                      ? [...draft.permissions, permission.value]
+                      : draft.permissions.filter((value) => value !== permission.value),
+                  })}
+                />
+                {permission.label}
+              </label>
+            ))}
+          </div>
+        </div>
         <Input required={!editing} placeholder={editing ? "New password optional" : "Password"} type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
         <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update staff" : "Create staff"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
       </form>
       </Drawer>
-      <AdminTable columns={["Name", "Email", "Phone", "Role", "Actions"]} rows={staff.map((user) => [user.name, user.email, user.phone || "-", user.role, <ActionButtons key="actions" busy={busy} onEdit={() => edit(user)} onDelete={() => run(() => adminService.deleteStaff(user.id), "Staff user deleted.")} />])} />
+      <AdminTable columns={["Name", "Email", "Phone", "Role", "Permissions", "Date", "Actions"]} rows={staff.map((user) => [user.name, user.email, user.phone || "-", <StatusBadge key="role" status={user.role} />, (user.permissions || []).join(", ") || "Role defaults", <DateCell key="date" value={user.created_at} />, <ActionButtons key="actions" busy={busy} onEdit={() => edit(user)} onDelete={() => run(() => adminService.deleteStaff(user.id), "Staff user deleted.")} />])} />
     </AdminCard>
   );
 }
 
 function OrderTable({ orders, action }: { orders: Order[]; action?: (order: Order) => ReactNode }) {
   return (
-    <AdminTable columns={["Order", "Customer", "Total", "Status", "Payment", ...(action ? ["Action"] : [])]} rows={orders.map((order) => [
-      <span key="order"><strong>{order.order_number}</strong><br /><small className="text-neutral-500">{order.created_at ? new Date(order.created_at).toLocaleDateString() : ""}</small></span>,
+    <AdminTable columns={["Order", "Customer", "Total", "Status", "Payment", "Date", ...(action ? ["Action"] : [])]} rows={orders.map((order) => [
+      <span key="order"><strong>{order.order_number}</strong></span>,
       <span key="customer">{order.customer.name}<br /><small className="text-neutral-500">{order.customer.phone || order.customer.email}</small></span>,
       formatCurrency(order.total),
-      order.status,
-      order.payment_status,
+      <StatusBadge key="status" status={order.status} />,
+      <StatusBadge key="payment" status={order.payment_status} />,
+      <DateCell key="date" value={order.created_at} />,
       ...(action ? [action(order)] : []),
     ])} />
   );
@@ -1460,6 +1893,30 @@ function PanelTitle({ title, subtitle }: { title: string; subtitle?: string }) {
       {subtitle && <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>}
     </div>
   );
+}
+
+function StatusBadge({ status }: { status?: string | null }) {
+  const normalized = String(status || "unknown").toLowerCase().replace(/\s+/g, "_");
+  const success = ["active", "approved", "paid", "success", "delivered", "complete", "completed", "shown", "admin", "restock", "return"];
+  const warning = ["pending", "processing", "assigned", "out_for_delivery", "manager", "adjustment"];
+  const danger = ["cancelled", "canceled", "failed", "rejected", "inactive", "refunded", "damage"];
+  const className = success.includes(normalized)
+    ? "border-green-200 bg-green-50 text-green-700"
+    : warning.includes(normalized)
+      ? "border-yellow-200 bg-yellow-50 text-yellow-800"
+      : danger.includes(normalized)
+        ? "border-red-200 bg-red-50 text-red-700"
+        : "border-neutral-200 bg-neutral-100 text-neutral-600";
+
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase", className)}>
+      {titleCase(normalized)}
+    </span>
+  );
+}
+
+function DateCell({ value }: { value?: string | null }) {
+  return <span className="whitespace-nowrap text-sm text-neutral-600">{relativeDate(value)}</span>;
 }
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
@@ -1698,6 +2155,32 @@ function productPayload(draft: ProductDraft) {
   };
 }
 
+function shippingPayload(draft: ShippingDraft) {
+  return {
+    name: draft.name,
+    code: draft.code || slugify(draft.name),
+    description: draft.description,
+    fee: Number(draft.fee || 0),
+    min_order_total: draft.min_order_total ? Number(draft.min_order_total) : null,
+    sort_order: Number(draft.sort_order || 0),
+    is_active: draft.is_active,
+  };
+}
+
+function bannerPayload(draft: BannerDraft) {
+  return {
+    title: draft.title,
+    subtitle: draft.subtitle,
+    image_url: draft.image_url,
+    link_url: draft.link_url,
+    position: draft.position,
+    starts_at: draft.starts_at || null,
+    ends_at: draft.ends_at || null,
+    sort_order: Number(draft.sort_order || 0),
+    is_active: draft.is_active,
+  };
+}
+
 function productFormData(draft: ProductDraft, files: File[]) {
   const payload = productPayload(draft);
   const formData = new FormData();
@@ -1835,6 +2318,16 @@ function storePayload(draft: StoreDraft) {
 }
 
 function buildAdminNotifications(data: ReturnType<typeof useAdmin>["data"]): AdminNotification[] {
+  if (data.notifications?.length) {
+    return data.notifications.map((notification, index) => ({
+      id: `${notification.type}-${index}`,
+      title: notification.title,
+      message: notification.message,
+      tone: notification.type.includes("failed") || notification.type.includes("low_stock") ? "warning" : notification.type.includes("new_order") ? "info" : "success",
+      tab: tabs.includes(notification.target as Tab) ? notification.target as Tab : "overview",
+    }));
+  }
+
   const lowStockAlerts = (data.notificationProducts || data.products)
     .filter((product) => product.low_stock || product.stock_quantity <= 10)
     .slice(0, 6)
@@ -1884,6 +2377,37 @@ function buildAdminNotifications(data: ReturnType<typeof useAdmin>["data"]): Adm
 
 function dateOnly(value?: string | null) {
   return value ? value.slice(0, 10) : "";
+}
+
+function datetimeLocal(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+}
+
+function relativeDate(value?: string | null) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (diffSeconds < 60) return `${diffSeconds || 1} sec ago`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"} ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function titleCase(value: string) {
@@ -1962,11 +2486,17 @@ function getExportRows(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
     categories: data.categories,
     orders: data.orders,
     coupons: data.coupons,
+    reviews: data.reviews || [],
+    questions: data.questions || [],
     reports: data.salesReport?.best_selling_products || [],
     payments: data.payments,
+    shipping: data.shippingMethods || [],
+    marketing: data.marketingBanners || [],
+    newsletter: data.newsletterSubscribers || [],
     inventory: data.inventoryLogs,
     branches: data.branches,
     staff: data.staff,
+    audit: data.auditLogs || [],
   };
   return map[tab];
 }
@@ -2036,6 +2566,140 @@ function exportPdf(title: string, rows: unknown[]) {
           <tbody>${objects.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody>
         </table>
         <script>window.onload = () => { window.print(); };</script>
+      </body>
+    </html>
+  `);
+  popup.document.close();
+}
+
+function printInvoice(order: Order) {
+  const popup = window.open("", "_blank", "width=980,height=1200");
+  if (!popup) return;
+
+  const items = order.items || [];
+  const itemsTotal = items.reduce((sum, item) => sum + Number(item.line_total || 0), 0);
+  const subtotal = Number(order.subtotal || itemsTotal);
+  const discount = Number(order.discount_total || 0);
+  const deliveryFee = Number(order.delivery_fee || 0);
+  const total = Number(order.total || subtotal - discount + deliveryFee);
+  const createdAt = order.created_at ? new Date(order.created_at).toLocaleString() : "-";
+
+  popup.document.write(`
+    <html>
+      <head>
+        <title>Invoice ${escapeHtml(order.order_number)}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          html, body { margin: 0; overflow: visible !important; background: #f4f4f1; color: #111; font-family: Arial, Helvetica, sans-serif; }
+          body::-webkit-scrollbar { display: none; }
+          body { -ms-overflow-style: none; scrollbar-width: none; }
+          .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 28px; }
+          .top { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #111; padding-bottom: 22px; }
+          .brand { font-size: 14px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+          .muted { color: #666; font-size: 12px; line-height: 1.7; }
+          h1 { margin: 10px 0 0; font-size: 42px; line-height: .95; letter-spacing: -0.05em; font-weight: 500; }
+          .invoice-meta { text-align: right; font-size: 12px; line-height: 1.8; }
+          .badge { display: inline-block; border-radius: 999px; padding: 5px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; border: 1px solid #ddd; background: #f7f7f7; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+          .box { border: 1px solid #e5e5e5; border-radius: 18px; padding: 16px; min-height: 120px; }
+          .label { margin: 0 0 10px; font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #777; }
+          .value { margin: 0; font-size: 14px; line-height: 1.65; }
+          table { width: 100%; border-collapse: collapse; margin-top: 26px; font-size: 12px; }
+          th { background: #111; color: #fff; text-align: left; padding: 12px; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+          td { border-bottom: 1px solid #ededed; padding: 13px 12px; vertical-align: top; }
+          .right { text-align: right; }
+          .totals { width: 300px; margin: 22px 0 0 auto; font-size: 13px; }
+          .totals-row { display: flex; justify-content: space-between; border-bottom: 1px solid #ededed; padding: 9px 0; }
+          .grand { font-size: 20px; font-weight: 900; border-bottom: 0; padding-top: 14px; }
+          .notes { margin-top: 28px; border-radius: 18px; background: #f7f7f4; padding: 16px; font-size: 12px; line-height: 1.7; color: #555; }
+          .footer { margin-top: 34px; display: flex; justify-content: space-between; gap: 24px; border-top: 1px solid #e5e5e5; padding-top: 16px; font-size: 11px; color: #777; }
+          @media print {
+            html, body { width: 210mm; background: #fff !important; overflow: visible !important; }
+            .sheet { width: auto; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <main class="sheet">
+          <section class="top">
+            <div>
+              <div class="brand">ECOMMERCE</div>
+              <h1>Invoice</h1>
+              <p class="muted">Reusable ecommerce backend invoice<br />Generated from the admin panel</p>
+            </div>
+            <div class="invoice-meta">
+              <strong>${escapeHtml(order.order_number)}</strong><br />
+              ${escapeHtml(createdAt)}<br />
+              <span class="badge">${escapeHtml(titleCase(order.status || "pending"))}</span>
+              <span class="badge">${escapeHtml(titleCase(order.payment_status || "unpaid"))}</span>
+            </div>
+          </section>
+
+          <section class="grid">
+            <div class="box">
+              <p class="label">Bill to</p>
+              <p class="value">
+                <strong>${escapeHtml(order.customer.name || "-")}</strong><br />
+                ${escapeHtml(order.customer.email || "-")}<br />
+                ${escapeHtml(order.customer.phone || "-")}
+              </p>
+            </div>
+            <div class="box">
+              <p class="label">Delivery</p>
+              <p class="value">
+                ${escapeHtml(order.delivery_address || "-")}<br />
+                Method: ${escapeHtml(titleCase(order.shipping_method || "standard"))}<br />
+                Tracking: ${escapeHtml(order.tracking_number || "-")}
+              </p>
+            </div>
+          </section>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="right">Qty</th>
+                <th class="right">Unit</th>
+                <th class="right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((item) => `
+                <tr>
+                  <td>
+                    <strong>${escapeHtml(item.product_name || "Item")}</strong><br />
+                    <span class="muted">${escapeHtml(item.variant_label || "")}</span>
+                  </td>
+                  <td class="right">${item.quantity}</td>
+                  <td class="right">${escapeHtml(formatCurrency(Number(item.unit_price || 0)))}</td>
+                  <td class="right">${escapeHtml(formatCurrency(Number(item.line_total || 0)))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <section class="totals">
+            <div class="totals-row"><span>Subtotal</span><strong>${escapeHtml(formatCurrency(subtotal))}</strong></div>
+            <div class="totals-row"><span>Discount</span><strong>${escapeHtml(formatCurrency(discount))}</strong></div>
+            <div class="totals-row"><span>Delivery</span><strong>${escapeHtml(formatCurrency(deliveryFee))}</strong></div>
+            <div class="totals-row grand"><span>Total</span><span>${escapeHtml(formatCurrency(total))}</span></div>
+          </section>
+
+          ${order.order_notes ? `<section class="notes"><strong>Order notes:</strong><br />${escapeHtml(order.order_notes)}</section>` : ""}
+
+          <footer class="footer">
+            <span>Thank you for your order.</span>
+            <span>Printed on ${escapeHtml(new Date().toLocaleString())}</span>
+          </footer>
+        </main>
+        <script>
+          window.onload = () => {
+            window.focus();
+            window.print();
+          };
+        </script>
       </body>
     </html>
   `);

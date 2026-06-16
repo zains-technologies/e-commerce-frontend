@@ -80,6 +80,8 @@ export function useCart() {
     addItem: (payload: AddToCartPayload) => run(() => cartService.add(payload)),
     updateItem: (itemId: number, quantity: number) => run(() => cartService.updateItem(itemId, quantity)),
     removeItem: (itemId: number) => run(() => cartService.removeItem(itemId)),
+    applyCoupon: (code: string) => run(() => cartService.applyCoupon(code)),
+    removeCoupon: () => run(() => cartService.removeCoupon()),
     clear: () => run(() => cartService.clear()),
   };
 }

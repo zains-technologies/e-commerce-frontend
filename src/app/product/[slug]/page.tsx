@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { ErrorState, LoadingState } from "@/components/common/StateBlock";
 import { Shell } from "@/components/layout/Shell";
@@ -20,6 +20,10 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState("");
   const [variant, setVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [review, setReview] = useState({ customer_name: "", customer_email: "", rating: 5, comment: "" });
+  const [question, setQuestion] = useState({ customer_name: "", customer_email: "", question: "" });
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [questionMessage, setQuestionMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { products } = useProducts();
@@ -39,6 +43,22 @@ export default function ProductDetailPage() {
   }, [slug]);
 
   const price = useMemo(() => (product ? product.price + (variant?.price_adjustment || 0) : 0), [product, variant]);
+
+  async function submitReview(event: FormEvent) {
+    event.preventDefault();
+    if (!product) return;
+    await productService.submitReview(product.id, review);
+    setReview({ customer_name: "", customer_email: "", rating: 5, comment: "" });
+    setReviewMessage("Review submitted. It will appear after admin approval.");
+  }
+
+  async function submitQuestion(event: FormEvent) {
+    event.preventDefault();
+    if (!product) return;
+    await productService.submitQuestion(product.id, question);
+    setQuestion({ customer_name: "", customer_email: "", question: "" });
+    setQuestionMessage("Question submitted. The store team can answer it from the admin panel.");
+  }
 
   return (
     <Shell>
@@ -140,6 +160,47 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ) : null}
+            <div className="mt-14 grid gap-5 lg:grid-cols-[1fr_420px]">
+              <div className="rounded-[28px] border border-neutral-200 p-5">
+                <h2 className="text-3xl font-medium tracking-[-0.04em]">Questions & answers</h2>
+                {product.questions?.length ? (
+                  <div className="mt-5 space-y-3">
+                    {product.questions.map((item) => (
+                      <div key={item.id} className="rounded-[22px] bg-neutral-50 p-4">
+                        <p className="text-sm font-black">Q: {item.question}</p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-600">A: {item.answer || "The store team has not answered yet."}</p>
+                        <p className="mt-3 text-xs font-bold uppercase text-neutral-400">{item.customer_name}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-neutral-500">No questions yet. Ask the first one.</p>
+                )}
+              </div>
+              <form onSubmit={submitQuestion} className="rounded-[28px] border border-neutral-200 p-5">
+                <h2 className="text-3xl font-medium tracking-[-0.04em]">Ask a question</h2>
+                {questionMessage && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-bold text-green-700">{questionMessage}</p>}
+                <div className="mt-5 grid gap-3">
+                  <input required className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Name" value={question.customer_name} onChange={(event) => setQuestion({ ...question, customer_name: event.target.value })} />
+                  <input className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Email" type="email" value={question.customer_email} onChange={(event) => setQuestion({ ...question, customer_email: event.target.value })} />
+                  <textarea required className="min-h-28 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="Question" value={question.question} onChange={(event) => setQuestion({ ...question, question: event.target.value })} />
+                </div>
+                <Button className="mt-4">Submit question</Button>
+              </form>
+            </div>
+            <form onSubmit={submitReview} className="mt-14 rounded-[28px] border border-neutral-200 p-5">
+              <h2 className="text-3xl font-medium tracking-[-0.04em]">Write a review</h2>
+              {reviewMessage && <p className="mt-4 rounded-2xl bg-green-50 p-3 text-sm font-bold text-green-700">{reviewMessage}</p>}
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <input required className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Name" value={review.customer_name} onChange={(event) => setReview({ ...review, customer_name: event.target.value })} />
+                <input className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Email" type="email" value={review.customer_email} onChange={(event) => setReview({ ...review, customer_email: event.target.value })} />
+                <select className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>
+                  {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}
+                </select>
+              </div>
+              <textarea className="mt-4 min-h-28 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="Review" value={review.comment} onChange={(event) => setReview({ ...review, comment: event.target.value })} />
+              <Button className="mt-4">Submit review</Button>
+            </form>
           </>
         )}
       </section>

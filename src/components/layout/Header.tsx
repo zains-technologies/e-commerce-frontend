@@ -22,7 +22,7 @@ export function Header() {
           <span>Dollar</span>
         </div>
         <div className="flex gap-8">
-          <span>Tracking Package</span>
+          <Link href="/track-order" className="hover:text-black">Tracking Package</Link>
           <span>FAQ</span>
           <span>About Us</span>
           <span>Contact Us</span>
@@ -56,8 +56,8 @@ export function Header() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-4 text-xl">
-          <Link aria-label="Wishlist" href="/products" className="hidden md:inline">♡</Link>
-          <Link aria-label="Account" href="/login" className="hidden md:inline">♙</Link>
+          <Link aria-label="Wishlist" href="/wishlist" className="hidden md:inline">♡</Link>
+          <Link aria-label="Account" href="/account" className="hidden md:inline">♙</Link>
           <Link aria-label="Cart" href="/cart" className="relative">
             🛒
             {count > 0 && (

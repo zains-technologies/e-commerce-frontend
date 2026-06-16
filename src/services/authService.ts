@@ -27,6 +27,15 @@ export const authService = {
     return response.data;
   },
 
+  async updateProfile(payload: { name: string; email: string; phone?: string; password?: string }) {
+    const response = await apiRequest<{ success: boolean; data: User }>(API_ROUTES.ME, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+
   async logout() {
     await apiRequest(API_ROUTES.LOGOUT, { method: "POST", auth: true }).catch(() => null);
     clearToken();

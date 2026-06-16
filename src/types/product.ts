@@ -57,10 +57,24 @@ export interface ProductSpecification {
 
 export interface ProductReview {
   id: number;
+  product?: { id: number; name: string; slug: string };
   customer_name: string;
+  customer_email?: string | null;
   rating: number;
   comment?: string | null;
   status?: string;
+  created_at?: string;
+}
+
+export interface ProductQuestion {
+  id: number;
+  product?: { id: number; name: string; slug: string };
+  customer_name: string;
+  customer_email?: string | null;
+  question: string;
+  answer?: string | null;
+  status?: string;
+  answered_at?: string | null;
   created_at?: string;
 }
 
@@ -94,5 +108,8 @@ export interface Product {
     count: number;
   };
   reviews?: ProductReview[];
+  questions?: ProductQuestion[];
   related_products?: Array<{ id: number; name: string; slug: string; price: number; image?: string | null }>;
+  created_at?: string;
+  updated_at?: string;
 }

@@ -6,7 +6,7 @@ import { authService } from "@/services/authService";
 import type { AdminDashboardData } from "@/types/admin";
 import type { User } from "@/types/user";
 
-export type AdminSection = "overview" | "store" | "products" | "categories" | "orders" | "coupons" | "reports" | "payments" | "inventory" | "branches" | "staff";
+export type AdminSection = "overview" | "store" | "products" | "categories" | "orders" | "coupons" | "reviews" | "questions" | "reports" | "payments" | "shipping" | "marketing" | "newsletter" | "inventory" | "branches" | "staff" | "audit";
 
 const emptyData: AdminDashboardData = {
   products: [],
@@ -21,6 +21,13 @@ const emptyData: AdminDashboardData = {
   tags: [],
   collections: [],
   sizeGuides: [],
+  reviews: [],
+  notifications: [],
+  shippingMethods: [],
+  marketingBanners: [],
+  newsletterSubscribers: [],
+  questions: [],
+  auditLogs: [],
 };
 
 let cachedAdminUser: User | null = null;
@@ -84,6 +91,14 @@ export function useAdmin(section: AdminSection = "overview") {
         nextData.coupons = await adminService.coupons().catch(() => []);
       }
 
+      if (section === "reviews") {
+        nextData.reviews = await adminService.reviews().catch(() => []);
+      }
+
+      if (section === "questions") {
+        nextData.questions = await adminService.questions().catch(() => []);
+      }
+
       if (section === "reports") {
         const [salesReport, profitReport] = await Promise.all([
           adminService.salesReport().catch(() => undefined),
@@ -96,6 +111,18 @@ export function useAdmin(section: AdminSection = "overview") {
         const payments = await adminService.payments().catch(() => []);
         nextData.payments = payments;
         loadedPayments = payments;
+      }
+
+      if (section === "shipping") {
+        nextData.shippingMethods = await adminService.shippingMethods().catch(() => []);
+      }
+
+      if (section === "marketing") {
+        nextData.marketingBanners = await adminService.marketingBanners().catch(() => []);
+      }
+
+      if (section === "newsletter") {
+        nextData.newsletterSubscribers = await adminService.newsletterSubscribers().catch(() => []);
       }
 
       if (section === "inventory") {
@@ -115,10 +142,15 @@ export function useAdmin(section: AdminSection = "overview") {
         nextData.staff = await adminService.staff().catch(() => []);
       }
 
-      const [notificationProducts, notificationOrders, notificationPayments] = await Promise.all([
+      if (section === "audit") {
+        nextData.auditLogs = await adminService.auditLogs().catch(() => []);
+      }
+
+      const [notificationProducts, notificationOrders, notificationPayments, notifications] = await Promise.all([
         loadedProducts.length ? Promise.resolve(loadedProducts) : adminService.products().catch(() => []),
         loadedOrders.length ? Promise.resolve(loadedOrders) : adminService.orders().catch(() => []),
         loadedPayments.length ? Promise.resolve(loadedPayments) : adminService.payments().catch(() => []),
+        adminService.notifications().catch(() => []),
       ]);
       if (section === "overview") {
         nextData.products = notificationProducts;
@@ -127,6 +159,7 @@ export function useAdmin(section: AdminSection = "overview") {
       nextData.notificationProducts = notificationProducts;
       nextData.notificationOrders = notificationOrders;
       nextData.notificationPayments = notificationPayments;
+      nextData.notifications = notifications;
 
       setUser(currentUser);
       setData(nextData);

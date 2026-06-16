@@ -12,5 +12,20 @@ export const productService = {
     const response = await apiRequest<SingleResponse<Product>>(`${API_ROUTES.PRODUCTS}/${slug}`);
     return response.data;
   },
-};
 
+  async submitReview(productId: number, payload: { customer_name: string; customer_email?: string; rating: number; comment?: string }) {
+    const response = await apiRequest<SingleResponse<unknown>>(`${API_ROUTES.PRODUCTS}/${productId}/reviews`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+
+  async submitQuestion(productId: number, payload: { customer_name: string; customer_email?: string; question: string }) {
+    const response = await apiRequest<SingleResponse<unknown>>(`${API_ROUTES.PRODUCTS}/${productId}/questions`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+};

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/common/Badge";
 import { Button } from "@/components/common/Button";
 import { ErrorState, LoadingState } from "@/components/common/StateBlock";
@@ -9,6 +10,8 @@ import { CategoryChips } from "@/components/product/CategoryChips";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
+import { marketingService } from "@/services/marketingService";
+import type { MarketingBanner } from "@/types/marketing";
 
 const heroImages = {
   main: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1400&q=85",
@@ -35,20 +38,32 @@ const colors = [
 export default function Home() {
   const { products, loading, error } = useProducts();
   const { categories } = useCategories();
+  const [heroBanner, setHeroBanner] = useState<MarketingBanner | null>(null);
+  const [promoBanner, setPromoBanner] = useState<MarketingBanner | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      marketingService.banners("home_hero").catch(() => []),
+      marketingService.banners("promo").catch(() => []),
+    ]).then(([hero, promo]) => {
+      setHeroBanner(hero[0] || null);
+      setPromoBanner(promo[0] || null);
+    });
+  }, []);
 
   return (
     <Shell>
       <section className="container-shell pt-5">
         <div className="grid gap-2 md:grid-cols-[1fr_300px]">
           <div className="relative min-h-[410px] overflow-hidden rounded-[26px] bg-[#b7c0a7] md:min-h-[650px] md:rounded-[32px]">
-            <img src={heroImages.main} alt="Summer outfit" className="image-cover" />
+            <img src={heroBanner?.image_url || heroImages.main} alt={heroBanner?.title || "Summer outfit"} className="image-cover" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-transparent to-transparent" />
             <div className="absolute left-6 top-8 max-w-sm text-white md:left-12 md:top-12">
               <h1 className="text-5xl font-medium leading-[0.86] tracking-[-0.08em] md:text-7xl">
-                Color of Summer Outfit
+                {heroBanner?.title || "Color of Summer Outfit"}
               </h1>
-              <p className="mt-6 max-w-xs text-sm text-white/85">100+ Collections for your outfit inspirations in this summer</p>
-              <Link href="/products"><Button className="mt-6">View Collections</Button></Link>
+              <p className="mt-6 max-w-xs text-sm text-white/85">{heroBanner?.subtitle || "100+ Collections for your outfit inspirations in this summer"}</p>
+              <Link href={heroBanner?.link_url || "/products"}><Button className="mt-6">View Collections</Button></Link>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
@@ -107,14 +122,18 @@ export default function Home() {
 
       <section className="container-shell py-8">
         <div className="relative min-h-[340px] overflow-hidden rounded-[28px] bg-neutral-200 md:min-h-[470px]">
-          <img src={heroImages.testimonial} alt="Happy customer" className="image-cover" />
+          <img src={promoBanner?.image_url || heroImages.testimonial} alt={promoBanner?.title || "Happy customer"} className="image-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
           <div className="absolute left-7 top-9 max-w-md text-white md:left-16 md:top-16">
-            <p className="text-lg text-white/70">What people said</p>
-            <h2 className="mt-2 text-4xl font-medium leading-[0.95] tracking-[-0.07em] md:text-5xl">Love the way they handle the order.</h2>
-            <p className="mt-6 text-sm leading-6 text-white/75">Very professional and friendly at the same time. They packed the order on schedule and the detail of their wrapping is top notch.</p>
-            <p className="mt-6 font-bold">Samantha William</p>
-            <p className="text-xs text-white/55">Fashion Enthusiast</p>
+            <p className="text-lg text-white/70">{promoBanner ? "Store notice" : "What people said"}</p>
+            <h2 className="mt-2 text-4xl font-medium leading-[0.95] tracking-[-0.07em] md:text-5xl">{promoBanner?.title || "Love the way they handle the order."}</h2>
+            <p className="mt-6 text-sm leading-6 text-white/75">{promoBanner?.subtitle || "Very professional and friendly at the same time. They packed the order on schedule and the detail of their wrapping is top notch."}</p>
+            {promoBanner?.link_url ? <Link href={promoBanner.link_url}><Button className="mt-6">Shop now</Button></Link> : (
+              <>
+                <p className="mt-6 font-bold">Samantha William</p>
+                <p className="text-xs text-white/55">Fashion Enthusiast</p>
+              </>
+            )}
           </div>
         </div>
       </section>

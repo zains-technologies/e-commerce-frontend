@@ -1,6 +1,8 @@
 import type { Product } from "./product";
 import type { CatalogBrand, CatalogTag, ProductCollection, SizeGuide } from "./product";
+import type { ProductQuestion } from "./product";
 import type { Category } from "./category";
+import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "./marketing";
 
 export interface Order {
   id: number;
@@ -16,7 +18,12 @@ export interface Order {
   payment_method?: string | null;
   delivery_status?: string;
   tracking_number?: string | null;
-  items?: Array<{ id: number; product_name: string; quantity: number; line_total: number }>;
+  shipping_method?: string | null;
+  order_notes?: string | null;
+  delivery_assignee?: { id: number; name: string } | null;
+  timeline?: Array<{ label: string; status: string; at?: string | null }>;
+  payments?: Payment[];
+  items?: Array<{ id: number; product_name: string; sku?: string | null; variant_label?: string | null; quantity: number; unit_price?: number; line_total: number }>;
   created_at?: string;
 }
 
@@ -29,6 +36,7 @@ export interface Payment {
   amount: number;
   transaction_id?: string | null;
   paid_at?: string | null;
+  created_at?: string;
 }
 
 export interface Coupon {
@@ -41,6 +49,8 @@ export interface Coupon {
   usage_limit?: number | null;
   used_count?: number;
   is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface InventoryLog {
@@ -61,6 +71,8 @@ export interface Branch {
   phone?: string | null;
   address?: string | null;
   is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StaffUser {
@@ -69,6 +81,7 @@ export interface StaffUser {
   email: string;
   phone?: string | null;
   role: "admin" | "manager" | "staff";
+  permissions?: string[];
   store_id?: number;
   created_at?: string;
 }
@@ -109,6 +122,9 @@ export interface SalesReport {
   total_orders: number;
   total_revenue: number;
   best_selling_products: Array<{ product_name: string; quantity_sold: number; revenue: number }>;
+  sales_by_category?: Array<{ category_name: string; quantity_sold: number; revenue: number }>;
+  sales_by_payment_method?: Array<{ payment_method: string; orders: number; revenue: number }>;
+  customer_report?: Array<{ customer_name: string; customer_email?: string | null; orders: number; revenue: number }>;
 }
 
 export interface ProfitReport {
@@ -136,4 +152,22 @@ export interface AdminDashboardData {
   tags?: CatalogTag[];
   collections?: ProductCollection[];
   sizeGuides?: SizeGuide[];
+  reviews?: import("./product").ProductReview[];
+  notifications?: Array<{ type: string; title: string; message: string; target: string }>;
+  shippingMethods?: ShippingMethod[];
+  marketingBanners?: MarketingBanner[];
+  newsletterSubscribers?: NewsletterSubscriber[];
+  questions?: ProductQuestion[];
+  auditLogs?: AuditLog[];
+}
+
+export interface AuditLog {
+  id: number;
+  user?: { id: number; name: string; email: string } | null;
+  action: string;
+  subject_type?: string | null;
+  subject_id?: number | null;
+  description?: string | null;
+  properties?: Record<string, unknown> | null;
+  created_at?: string;
 }

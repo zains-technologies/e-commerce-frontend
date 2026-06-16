@@ -194,9 +194,10 @@ export default function ProductDetailPage() {
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <input required className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Name" value={review.customer_name} onChange={(event) => setReview({ ...review, customer_name: event.target.value })} />
                 <input className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" placeholder="Email" type="email" value={review.customer_email} onChange={(event) => setReview({ ...review, customer_email: event.target.value })} />
-                <select className="h-12 rounded-full border border-neutral-200 px-4 text-sm outline-none focus:border-black" value={review.rating} onChange={(event) => setReview({ ...review, rating: Number(event.target.value) })}>
-                  {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}
-                </select>
+                <div className="flex h-12 items-center justify-between rounded-full border border-neutral-200 px-4 text-sm">
+                  <span className="text-neutral-500">Rating</span>
+                  <StarRating value={review.rating} onChange={(rating) => setReview({ ...review, rating })} />
+                </div>
               </div>
               <textarea className="mt-4 min-h-28 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="Review" value={review.comment} onChange={(event) => setReview({ ...review, comment: event.target.value })} />
               <Button className="mt-4">Submit review</Button>
@@ -205,5 +206,29 @@ export default function ProductDetailPage() {
         )}
       </section>
     </Shell>
+  );
+}
+
+function StarRating({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <div className="flex items-center gap-1" role="radiogroup" aria-label="Review rating">
+      {[1, 2, 3, 4, 5].map((rating) => {
+        const selected = rating <= value;
+
+        return (
+          <button
+            key={rating}
+            type="button"
+            className={`text-2xl leading-none transition hover:scale-110 ${selected ? "text-yellow-400" : "text-neutral-300"}`}
+            onClick={() => onChange(rating)}
+            role="radio"
+            aria-checked={value === rating}
+            aria-label={`${rating} star${rating === 1 ? "" : "s"}`}
+          >
+            ★
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -359,19 +359,28 @@ export const adminService = {
     });
   },
 
-  createBanner(payload: Record<string, unknown>) {
+  createBanner(payload: AdminPayload) {
     return apiRequest<SingleResponse<MarketingBanner>>(API_ROUTES.ADMIN_BANNERS, {
       method: "POST",
       auth: true,
-      body: JSON.stringify(payload),
+      body: bodyFor(payload),
     }).then((r) => r.data);
   },
 
-  updateBanner(bannerId: number, payload: Record<string, unknown>) {
+  updateBanner(bannerId: number, payload: AdminPayload) {
+    if (payload instanceof FormData) {
+      payload.append("_method", "PUT");
+      return apiRequest<SingleResponse<MarketingBanner>>(`${API_ROUTES.ADMIN_BANNERS}/${bannerId}`, {
+        method: "POST",
+        auth: true,
+        body: payload,
+      }).then((r) => r.data);
+    }
+
     return apiRequest<SingleResponse<MarketingBanner>>(`${API_ROUTES.ADMIN_BANNERS}/${bannerId}`, {
       method: "PUT",
       auth: true,
-      body: JSON.stringify(payload),
+      body: bodyFor(payload),
     }).then((r) => r.data);
   },
 

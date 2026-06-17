@@ -255,7 +255,7 @@ type BannerDraft = {
   id?: number;
   title: string;
   subtitle: string;
-  image_url: string;
+  current_image_url: string;
   link_url: string;
   position: string;
   starts_at: string;
@@ -294,7 +294,7 @@ const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", cu
 const emptyRestock: RestockDraft = { variant_id: "", quantity: "10", type: "restock", note: "Manual restock from admin panel" };
 const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", sizeGuide: "" };
 const emptyShipping: ShippingDraft = { name: "", code: "", description: "", fee: "0", min_order_total: "", sort_order: "0", is_active: true };
-const emptyBanner: BannerDraft = { title: "", subtitle: "", image_url: "", link_url: "/products", position: "home_hero", starts_at: "", ends_at: "", sort_order: "0", is_active: true };
+const emptyBanner: BannerDraft = { title: "", subtitle: "", current_image_url: "", link_url: "/products", position: "home_hero", starts_at: "", ends_at: "", sort_order: "0", is_active: true };
 const planOptions = [{ label: "Simple", value: "simple" }, { label: "Mid", value: "mid" }, { label: "Pro", value: "pro" }];
 const productStatusOptions = [{ label: "Active", value: "active" }, { label: "Inactive", value: "inactive" }, { label: "Draft", value: "draft" }];
 const couponTypeOptions = [{ label: "Percentage", value: "percentage" }, { label: "Fixed", value: "fixed" }];
@@ -685,9 +685,13 @@ function NotificationBell({
 function StorePanel({ store, busy, run }: { store?: StoreSettings; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState<StoreDraft>(emptyStore);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateStoreDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     await run(() => adminService.updateStore(storePayload(draft)), "Store settings updated.");
     setDrawerOpen(false);
   }
@@ -721,26 +725,26 @@ function StorePanel({ store, busy, run }: { store?: StoreSettings; busy: boolean
       </AdminCard>
       <Drawer open={drawerOpen} title="Edit store settings" subtitle="These settings identify the current tenant and control plan-based features." onClose={() => setDrawerOpen(false)}>
         <form onSubmit={submit} className="grid gap-3">
-          <Input required placeholder="Store name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <Input required placeholder="Store name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <div className="grid gap-3 md:grid-cols-2">
-            <Input placeholder="Email" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+            <Input placeholder="Email" type="email" value={draft.email} error={errors.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
             <Input placeholder="Phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
           </div>
           <Input placeholder="Address" value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} />
           <div className="grid gap-3 md:grid-cols-2">
-            <Input required placeholder="Currency" value={draft.currency} onChange={(e) => setDraft({ ...draft, currency: e.target.value.toUpperCase() })} />
+            <Input required placeholder="Currency" value={draft.currency} error={errors.currency} onChange={(e) => setDraft({ ...draft, currency: e.target.value.toUpperCase() })} />
             <Dropdown value={draft.plan} options={planOptions} onChange={(value) => setDraft({ ...draft, plan: value as StoreDraft["plan"] })} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Input placeholder="Default domain" value={draft.domain} onChange={(e) => setDraft({ ...draft, domain: e.target.value })} />
-            <Input placeholder="Custom domain" value={draft.custom_domain} onChange={(e) => setDraft({ ...draft, custom_domain: e.target.value })} />
+            <Input placeholder="Default domain" value={draft.domain} error={errors.domain} onChange={(e) => setDraft({ ...draft, domain: e.target.value })} />
+            <Input placeholder="Custom domain" value={draft.custom_domain} error={errors.custom_domain} onChange={(e) => setDraft({ ...draft, custom_domain: e.target.value })} />
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <ColorInput label="Primary" value={draft.primary} onChange={(value) => setDraft({ ...draft, primary: value })} />
             <ColorInput label="Secondary" value={draft.secondary} onChange={(value) => setDraft({ ...draft, secondary: value })} />
             <ColorInput label="Accent" value={draft.accent} onChange={(value) => setDraft({ ...draft, accent: value })} />
           </div>
-          <Input placeholder="Delivery fee" type="number" value={draft.delivery_fee} onChange={(e) => setDraft({ ...draft, delivery_fee: e.target.value })} />
+          <Input placeholder="Delivery fee" type="number" value={draft.delivery_fee} error={errors.delivery_fee} onChange={(e) => setDraft({ ...draft, delivery_fee: e.target.value })} />
           <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4">
             <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 text-sm">
               <input type="checkbox" checked={draft.notice_enabled} onChange={(e) => setDraft({ ...draft, notice_enabled: e.target.checked })} />
@@ -792,6 +796,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageError, setImageError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [viewer, setViewer] = useState<{ src: string; label: string } | null>(null);
   const [pendingImageDelete, setPendingImageDelete] = useState<{ id: number; label: string } | null>(null);
   const [catalogDraft, setCatalogDraft] = useState<CatalogQuickDraft>(emptyCatalogQuick);
@@ -812,6 +817,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
   function edit(product: Product) {
     setImageFiles([]);
     setImageError("");
+    setErrors({});
     setDraft({
       id: product.id,
       category_id: String(product.category?.id || categories[0]?.id || 1),
@@ -852,6 +858,9 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
       setImageError("You can upload a maximum of 5 images.");
       return;
     }
+    const nextErrors = validateProductDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
 
     await run(
       async () => {
@@ -871,6 +880,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
     setDraft(emptyProduct);
     setImageFiles([]);
     setImageError("");
+    setErrors({});
     setDrawerOpen(false);
   }
 
@@ -878,6 +888,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
     setDraft({ ...emptyProduct, category_id: String(categories[0]?.id || 1) });
     setImageFiles([]);
     setImageError("");
+    setErrors({});
     setDrawerOpen(true);
   }
 
@@ -951,15 +962,18 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
       <form onSubmit={submit} className="grid gap-5">
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="grid gap-3">
-        <Dropdown value={draft.category_id} options={categoryOptions(categories)} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
+        <div>
+          <Dropdown value={draft.category_id} options={categoryOptions(categories)} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
+          {errors.category_id && <p className="mt-1.5 px-4 text-xs font-bold text-red-600">{errors.category_id}</p>}
+        </div>
         <Dropdown value={draft.brand_id} options={[{ label: "No brand", value: "" }, ...brands.map((brand) => ({ label: brand.name, value: String(brand.id) }))]} placeholder="Select brand" onChange={(value) => setDraft({ ...draft, brand_id: value })} />
         <Dropdown value={draft.size_guide_id} options={[{ label: "No size guide", value: "" }, ...sizeGuides.map((guide) => ({ label: guide.name, value: String(guide.id) }))]} placeholder="Select size guide" onChange={(value) => setDraft({ ...draft, size_guide_id: value })} />
-        <Input required placeholder="Product name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <Input required placeholder="Slug" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
-        <Input placeholder="SKU" value={draft.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} />
-        <Input required placeholder="Price" type="number" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
-        <Input placeholder="Cost price" type="number" value={draft.cost_price} onChange={(e) => setDraft({ ...draft, cost_price: e.target.value })} />
-        <Input required placeholder="Stock quantity" type="number" value={draft.stock_quantity} onChange={(e) => setDraft({ ...draft, stock_quantity: e.target.value })} />
+        <Input required placeholder="Product name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <Input required placeholder="Slug" value={draft.slug} error={errors.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
+        <Input placeholder="SKU" value={draft.sku} error={errors.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} />
+        <Input required placeholder="Price" type="number" value={draft.price} error={errors.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
+        <Input placeholder="Cost price" type="number" value={draft.cost_price} error={errors.cost_price} onChange={(e) => setDraft({ ...draft, cost_price: e.target.value })} />
+        <Input required placeholder="Stock quantity" type="number" value={draft.stock_quantity} error={errors.stock_quantity} onChange={(e) => setDraft({ ...draft, stock_quantity: e.target.value })} />
         <Dropdown value={draft.status} options={productStatusOptions} onChange={(value) => setDraft({ ...draft, status: value })} />
         <textarea className="min-h-24 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <Input placeholder="SEO title" value={draft.seo_title} onChange={(e) => setDraft({ ...draft, seo_title: e.target.value })} />
@@ -1208,6 +1222,7 @@ function CatalogSetupPanel({
 
 function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<CategoryDraft>(emptyCategory);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
   const parentOptions = categoryParentOptions(categories, draft.id);
@@ -1226,14 +1241,15 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
       banner_path: category.banner_url || "",
       is_active: Boolean(category.is_active),
     });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!draft.is_parent && !draft.parent_id) {
-      return;
-    }
+    const nextErrors = validateCategoryDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const payload = {
       parent_id: draft.is_parent ? null : Number(draft.parent_id),
       show_in_header: draft.is_parent,
@@ -1254,7 +1270,7 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Category CRUD" subtitle="Manage active/inactive categories and slugs." />
-        <Button type="button" onClick={() => { setDraft(emptyCategory); setDrawerOpen(true); }}>Add category</Button>
+        <Button type="button" onClick={() => { setDraft(emptyCategory); setErrors({}); setDrawerOpen(true); }}>Add category</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit category" : "Add category"} subtitle="Enable parent category to show it in the header. Disable it to place this category under another category." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-3">
@@ -1270,21 +1286,25 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
           />
         </label>
         {!draft.is_parent && (
-          <Dropdown
-            value={draft.parent_id}
-            options={parentOptions}
-            placeholder="Select parent category"
-            onChange={(value) => setDraft({ ...draft, parent_id: value })}
-          />
+          <div>
+            <Dropdown
+              value={draft.parent_id}
+              options={parentOptions}
+              placeholder="Select parent category"
+              onChange={(value) => setDraft({ ...draft, parent_id: value })}
+            />
+            {errors.parent_id && <p className="mt-1.5 px-4 text-xs font-bold text-red-600">{errors.parent_id}</p>}
+          </div>
         )}
         <Input
           required
           placeholder={draft.is_parent ? "Parent category name, e.g. Men" : "Subcategory name, e.g. Footwear or Birkenstock Slipper"}
           value={draft.name}
+          error={errors.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value, slug: draft.slug || slugify(e.target.value) })}
         />
-        <Input required placeholder="Slug" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
-        <Input placeholder="Menu order, e.g. 10" type="number" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+        <Input required placeholder="Slug" value={draft.slug} error={errors.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
+        <Input placeholder="Menu order, e.g. 10" type="number" value={draft.sort_order} error={errors.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
         <Input placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <Input placeholder="Category image URL" value={draft.image_path} onChange={(e) => setDraft({ ...draft, image_path: e.target.value })} />
         <Input placeholder="Category banner URL" value={draft.banner_path} onChange={(e) => setDraft({ ...draft, banner_path: e.target.value })} />
@@ -1438,16 +1458,21 @@ function QuestionsPanel({ questions, busy, run }: { questions: ProductQuestion[]
 
 function CouponPanel({ coupons, busy, run }: { coupons: Coupon[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<CouponDraft>(emptyCoupon);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
 
   function edit(coupon: Coupon) {
     setDraft({ id: coupon.id, code: coupon.code, type: coupon.type, value: String(coupon.value), starts_at: dateOnly(coupon.starts_at), ends_at: dateOnly(coupon.ends_at), usage_limit: String(coupon.usage_limit || ""), is_active: coupon.is_active });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateCouponDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const payload = { ...draft, value: Number(draft.value), usage_limit: draft.usage_limit ? Number(draft.usage_limit) : null };
     await run(() => editing && draft.id ? adminService.updateCoupon(draft.id, payload) : adminService.createCoupon(payload), editing ? "Coupon updated." : "Coupon created.");
     setDraft(emptyCoupon);
@@ -1458,16 +1483,16 @@ function CouponPanel({ coupons, busy, run }: { coupons: Coupon[]; busy: boolean;
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Coupon CRUD" subtitle="Create percentage/fixed discounts and manage active status." />
-        <Button type="button" onClick={() => { setDraft(emptyCoupon); setDrawerOpen(true); }}>Add coupon</Button>
+        <Button type="button" onClick={() => { setDraft(emptyCoupon); setErrors({}); setDrawerOpen(true); }}>Add coupon</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit coupon" : "Add coupon"} subtitle="Coupons are available for mid/pro plans." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-3">
-        <Input required placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })} />
+        <Input required placeholder="Code" value={draft.code} error={errors.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })} />
         <Dropdown value={draft.type} options={couponTypeOptions} onChange={(value) => setDraft({ ...draft, type: value as CouponDraft["type"] })} />
-        <Input required placeholder="Value" type="number" value={draft.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
-        <Input placeholder="Usage limit" type="number" value={draft.usage_limit} onChange={(e) => setDraft({ ...draft, usage_limit: e.target.value })} />
-        <Input placeholder="Starts at" type="date" value={draft.starts_at} onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })} />
-        <Input placeholder="Ends at" type="date" value={draft.ends_at} onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })} />
+        <Input required placeholder="Value" type="number" value={draft.value} error={errors.value} onChange={(e) => setDraft({ ...draft, value: e.target.value })} />
+        <Input placeholder="Usage limit" type="number" value={draft.usage_limit} error={errors.usage_limit} onChange={(e) => setDraft({ ...draft, usage_limit: e.target.value })} />
+        <Input placeholder="Starts at" type="date" value={draft.starts_at} error={errors.starts_at} onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })} />
+        <Input placeholder="Ends at" type="date" value={draft.ends_at} error={errors.ends_at} onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })} />
         <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
         <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update coupon" : "Create coupon"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
       </form>
@@ -1487,6 +1512,7 @@ function CouponPanel({ coupons, busy, run }: { coupons: Coupon[]; busy: boolean;
 
 function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<ShippingDraft>(emptyShipping);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
 
@@ -1501,11 +1527,15 @@ function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy
       sort_order: String(method.sort_order || 0),
       is_active: method.is_active,
     });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateShippingDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const payload = shippingPayload(draft);
     await run(() => editing && draft.id ? adminService.updateShippingMethod(draft.id, payload) : adminService.createShippingMethod(payload), editing ? "Shipping method updated." : "Shipping method created.");
     setDraft(emptyShipping);
@@ -1516,17 +1546,17 @@ function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Shipping methods" subtitle="These options appear in checkout and control delivery fees." />
-        <Button type="button" onClick={() => { setDraft(emptyShipping); setDrawerOpen(true); }}>Add method</Button>
+        <Button type="button" onClick={() => { setDraft(emptyShipping); setErrors({}); setDrawerOpen(true); }}>Add method</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit shipping method" : "Add shipping method"} subtitle="Use codes like standard, express, or pickup for frontend clarity." onClose={() => setDrawerOpen(false)}>
         <form onSubmit={submit} className="grid gap-3">
-          <Input required placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value, code: draft.code || slugify(e.target.value) })} />
-          <Input placeholder="Code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
+          <Input required placeholder="Name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value, code: draft.code || slugify(e.target.value) })} />
+          <Input placeholder="Code" value={draft.code} error={errors.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
           <Input placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
           <div className="grid gap-3 md:grid-cols-3">
-            <Input required type="number" placeholder="Fee" value={draft.fee} onChange={(e) => setDraft({ ...draft, fee: e.target.value })} />
-            <Input type="number" placeholder="Min order total" value={draft.min_order_total} onChange={(e) => setDraft({ ...draft, min_order_total: e.target.value })} />
-            <Input type="number" placeholder="Sort order" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+            <Input required type="number" placeholder="Fee" value={draft.fee} error={errors.fee} onChange={(e) => setDraft({ ...draft, fee: e.target.value })} />
+            <Input type="number" placeholder="Min order total" value={draft.min_order_total} error={errors.min_order_total} onChange={(e) => setDraft({ ...draft, min_order_total: e.target.value })} />
+            <Input type="number" placeholder="Sort order" value={draft.sort_order} error={errors.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
           </div>
           <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
           <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update method" : "Create method"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
@@ -1547,15 +1577,24 @@ function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy
 
 function MarketingPanel({ banners, busy, run }: { banners: MarketingBanner[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<BannerDraft>(emptyBanner);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
+  const imagePreview = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : draft.current_image_url, [imageFile, draft.current_image_url]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imageFile) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview, imageFile]);
 
   function edit(banner: MarketingBanner) {
     setDraft({
       id: banner.id,
       title: banner.title,
       subtitle: banner.subtitle || "",
-      image_url: banner.image_url || "",
+      current_image_url: banner.image_url || "",
       link_url: banner.link_url || "",
       position: banner.position,
       starts_at: datetimeLocal(banner.starts_at),
@@ -1563,14 +1602,22 @@ function MarketingPanel({ banners, busy, run }: { banners: MarketingBanner[]; bu
       sort_order: String(banner.sort_order || 0),
       is_active: banner.is_active,
     });
+    setImageFile(null);
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const payload = bannerPayload(draft);
+    const nextErrors = validateBannerDraft(draft, imageFile);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
+    const payload = bannerFormData(draft, imageFile);
     await run(() => editing && draft.id ? adminService.updateBanner(draft.id, payload) : adminService.createBanner(payload), editing ? "Banner updated." : "Banner created.");
     setDraft(emptyBanner);
+    setImageFile(null);
+    setErrors({});
     setDrawerOpen(false);
   }
 
@@ -1578,22 +1625,39 @@ function MarketingPanel({ banners, busy, run }: { banners: MarketingBanner[]; bu
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Marketing banners" subtitle="Control hero images, promo panels, and customer notice banners from the backend." />
-        <Button type="button" onClick={() => { setDraft(emptyBanner); setDrawerOpen(true); }}>Add banner</Button>
+        <Button type="button" onClick={() => { setDraft(emptyBanner); setImageFile(null); setErrors({}); setDrawerOpen(true); }}>Add banner</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit banner" : "Add banner"} subtitle="Positions like home_hero and promo are already wired into the storefront." onClose={() => setDrawerOpen(false)}>
         <form onSubmit={submit} className="grid gap-3">
-          <Dropdown value={draft.position} options={bannerPositionOptions} onChange={(value) => setDraft({ ...draft, position: value })} />
-          <Input required placeholder="Title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-          <Input placeholder="Subtitle" value={draft.subtitle} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} />
-          <Input placeholder="Image URL" value={draft.image_url} onChange={(e) => setDraft({ ...draft, image_url: e.target.value })} />
-          <Input placeholder="Link URL" value={draft.link_url} onChange={(e) => setDraft({ ...draft, link_url: e.target.value })} />
+          <div>
+            <Dropdown value={draft.position} options={bannerPositionOptions} onChange={(value) => setDraft({ ...draft, position: value })} />
+            {errors.position && <p className="mt-1.5 px-4 text-xs font-bold text-red-600">{errors.position}</p>}
+          </div>
+          <Input required placeholder="Title" value={draft.title} error={errors.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+          <Input placeholder="Subtitle" value={draft.subtitle} error={errors.subtitle} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} />
+          <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed bg-white px-4 py-6 text-center text-sm hover:border-black ${errors.image ? "border-red-400 bg-red-50/40" : "border-neutral-300"}`}>
+            <span className="font-bold">Upload banner image</span>
+            <span className="mt-1 text-xs text-neutral-500">JPG, PNG, or WebP. Recommended wide image.</span>
+            <input
+              className="sr-only"
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setImageFile(file);
+                setErrors((current) => ({ ...current, image: "" }));
+              }}
+            />
+          </label>
+          {errors.image && <p className="px-4 text-xs font-bold text-red-600">{errors.image}</p>}
+          <Input placeholder="Link URL, e.g. /products" value={draft.link_url} error={errors.link_url} onChange={(e) => setDraft({ ...draft, link_url: e.target.value })} />
           <div className="grid gap-3 md:grid-cols-3">
-            <Input type="datetime-local" placeholder="Starts at" value={draft.starts_at} onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })} />
-            <Input type="datetime-local" placeholder="Ends at" value={draft.ends_at} onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })} />
-            <Input type="number" placeholder="Sort order" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+            <Input type="datetime-local" placeholder="Starts at" value={draft.starts_at} error={errors.starts_at} onChange={(e) => setDraft({ ...draft, starts_at: e.target.value })} />
+            <Input type="datetime-local" placeholder="Ends at" value={draft.ends_at} error={errors.ends_at} onChange={(e) => setDraft({ ...draft, ends_at: e.target.value })} />
+            <Input type="number" placeholder="Sort order" value={draft.sort_order} error={errors.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
           </div>
           <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
-          {draft.image_url && <img src={draft.image_url} alt={draft.title || "Banner preview"} className="aspect-[2.4] rounded-[24px] object-cover" />}
+          {imagePreview && <img src={imagePreview} alt={draft.title || "Banner preview"} className="aspect-[2.4] rounded-[24px] object-cover" />}
           <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update banner" : "Create banner"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
         </form>
       </Drawer>
@@ -1706,15 +1770,20 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
   const lowStock = products.filter((product) => product.low_stock || product.stock_quantity <= 10);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState<RestockDraft>(emptyRestock);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function openRestock(product: Product) {
     setDraft({ product, variant_id: "", quantity: "10", type: "restock", note: `Restock ${product.name}` });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.product) return;
+    const nextErrors = validateRestockDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const quantity = Math.abs(Number(draft.quantity));
     const quantityChange = draft.type === "damage" ? -quantity : quantity;
     await run(() => adminService.adjustInventory({
@@ -1763,8 +1832,8 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
             />
           ) : null}
           <Dropdown value={draft.type} options={inventoryTypeOptions} onChange={(value) => setDraft({ ...draft, type: value as RestockDraft["type"] })} />
-          <Input required min={1} type="number" placeholder="Quantity" value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} />
-          <Input required placeholder="Reason note" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          <Input required min={1} type="number" placeholder="Quantity" value={draft.quantity} error={errors.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} />
+          <Input required placeholder="Reason note" value={draft.note} error={errors.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
           <div className="flex gap-2">
             <Button disabled={busy}>{busy ? "Saving..." : "Save adjustment"}</Button>
             <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
@@ -1777,16 +1846,21 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
 
 function BranchPanel({ branches, busy, run }: { branches: Branch[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<BranchDraft>(emptyBranch);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
 
   function edit(branch: Branch) {
     setDraft({ id: branch.id, name: branch.name, phone: branch.phone || "", address: branch.address || "", is_active: branch.is_active });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateBranchDraft(draft);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     await run(() => editing && draft.id ? adminService.updateBranch(draft.id, draft) : adminService.createBranch(draft), editing ? "Branch updated." : "Branch created.");
     setDraft(emptyBranch);
     setDrawerOpen(false);
@@ -1796,11 +1870,11 @@ function BranchPanel({ branches, busy, run }: { branches: Branch[]; busy: boolea
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Branch CRUD" subtitle="Manage multi-branch locations for pro stores." />
-        <Button type="button" onClick={() => { setDraft(emptyBranch); setDrawerOpen(true); }}>Add branch</Button>
+        <Button type="button" onClick={() => { setDraft(emptyBranch); setErrors({}); setDrawerOpen(true); }}>Add branch</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit branch" : "Add branch"} subtitle="Branches are available for pro plan stores." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-3">
-        <Input required placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <Input required placeholder="Name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <Input placeholder="Phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
         <Input placeholder="Address" value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} />
         <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
@@ -1814,16 +1888,21 @@ function BranchPanel({ branches, busy, run }: { branches: Branch[]; busy: boolea
 
 function StaffPanel({ staff, busy, run }: { staff: StaffUser[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<StaffDraft>(emptyStaff);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
   const editing = Boolean(draft.id);
 
   function edit(user: StaffUser) {
     setDraft({ id: user.id, name: user.name, email: user.email, phone: user.phone || "", role: user.role, permissions: user.permissions || [], password: "" });
+    setErrors({});
     setDrawerOpen(true);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors = validateStaffDraft(draft, editing);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     const payload = { ...draft };
     if (editing && !payload.password) delete (payload as Partial<StaffDraft>).password;
     await run(() => editing && draft.id ? adminService.updateStaff(draft.id, payload) : adminService.createStaff(payload), editing ? "Staff user updated." : "Staff user created.");
@@ -1835,12 +1914,12 @@ function StaffPanel({ staff, busy, run }: { staff: StaffUser[]; busy: boolean; r
     <AdminCard>
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <PanelTitle title="Staff CRUD" subtitle="Admin, manager, and staff users for pro stores." />
-        <Button type="button" onClick={() => { setDraft(emptyStaff); setDrawerOpen(true); }}>Add staff</Button>
+        <Button type="button" onClick={() => { setDraft(emptyStaff); setErrors({}); setDrawerOpen(true); }}>Add staff</Button>
       </div>
       <Drawer open={drawerOpen} title={editing ? "Edit staff user" : "Add staff user"} subtitle="Staff roles are available for pro plan stores." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-3">
-        <Input required placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <Input required placeholder="Email" type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+        <Input required placeholder="Name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <Input required placeholder="Email" type="email" value={draft.email} error={errors.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
         <Input placeholder="Phone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
         <Dropdown value={draft.role} options={staffRoleOptions} onChange={(value) => setDraft({ ...draft, role: value as StaffDraft["role"] })} />
         <div className="rounded-[24px] border border-neutral-200 p-4">
@@ -1863,7 +1942,7 @@ function StaffPanel({ staff, busy, run }: { staff: StaffUser[]; busy: boolean; r
             ))}
           </div>
         </div>
-        <Input required={!editing} placeholder={editing ? "New password optional" : "Password"} type="password" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
+        <Input required={!editing} placeholder={editing ? "New password optional" : "Password"} type="password" value={draft.password} error={errors.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
         <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update staff" : "Create staff"}</Button><Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button></div>
       </form>
       </Drawer>
@@ -2167,11 +2246,11 @@ function shippingPayload(draft: ShippingDraft) {
   };
 }
 
-function bannerPayload(draft: BannerDraft) {
-  return {
+function bannerFormData(draft: BannerDraft, image: File | null) {
+  const formData = new FormData();
+  const payload = {
     title: draft.title,
     subtitle: draft.subtitle,
-    image_url: draft.image_url,
     link_url: draft.link_url,
     position: draft.position,
     starts_at: draft.starts_at || null,
@@ -2179,6 +2258,120 @@ function bannerPayload(draft: BannerDraft) {
     sort_order: Number(draft.sort_order || 0),
     is_active: draft.is_active,
   };
+  appendFormData(formData, payload);
+  if (image) formData.append("image", image);
+  return formData;
+}
+
+function validateBannerDraft(draft: BannerDraft, image: File | null) {
+  const errors: Record<string, string> = {};
+  if (!draft.position.trim()) errors.position = "Choose where this banner should appear.";
+  if (!draft.title.trim()) errors.title = "Banner title is required.";
+  if (draft.subtitle.length > 500) errors.subtitle = "Subtitle must be 500 characters or less.";
+  if (!image && !draft.current_image_url) errors.image = "Please upload a banner image.";
+  if (image && !image.type.startsWith("image/")) errors.image = "Please select a valid image file.";
+  if (image && image.size > 4 * 1024 * 1024) errors.image = "Image must be 4MB or smaller.";
+  if (draft.link_url && !draft.link_url.startsWith("/") && !draft.link_url.startsWith("http://") && !draft.link_url.startsWith("https://")) {
+    errors.link_url = "Use a site path like /products or a full URL.";
+  }
+  if (draft.sort_order && Number(draft.sort_order) < 0) errors.sort_order = "Sort order cannot be negative.";
+  if (draft.starts_at && draft.ends_at && new Date(draft.ends_at) < new Date(draft.starts_at)) {
+    errors.ends_at = "End date must be after start date.";
+  }
+  return errors;
+}
+
+function validateStoreDraft(draft: StoreDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.name.trim()) errors.name = "Store name is required.";
+  if (draft.email && !isEmail(draft.email)) errors.email = "Enter a valid email address.";
+  if (!draft.currency.trim()) errors.currency = "Currency is required.";
+  if (draft.currency && draft.currency.trim().length !== 3) errors.currency = "Use a 3-letter currency code like LKR.";
+  if (draft.delivery_fee && Number(draft.delivery_fee) < 0) errors.delivery_fee = "Delivery fee cannot be negative.";
+  if (draft.domain && /\s/.test(draft.domain)) errors.domain = "Domain cannot contain spaces.";
+  if (draft.custom_domain && /\s/.test(draft.custom_domain)) errors.custom_domain = "Custom domain cannot contain spaces.";
+  return errors;
+}
+
+function validateProductDraft(draft: ProductDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.category_id) errors.category_id = "Select a category.";
+  if (!draft.name.trim()) errors.name = "Product name is required.";
+  if (!draft.slug.trim()) errors.slug = "Slug is required.";
+  if (draft.slug && !isSlug(draft.slug)) errors.slug = "Use lowercase letters, numbers, and hyphens only.";
+  if (draft.price === "" || Number(draft.price) < 0) errors.price = "Enter a valid product price.";
+  if (draft.cost_price && Number(draft.cost_price) < 0) errors.cost_price = "Cost price cannot be negative.";
+  if (draft.stock_quantity === "" || Number(draft.stock_quantity) < 0 || !Number.isInteger(Number(draft.stock_quantity))) {
+    errors.stock_quantity = "Stock must be a whole number.";
+  }
+  return errors;
+}
+
+function validateCategoryDraft(draft: CategoryDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.is_parent && !draft.parent_id) errors.parent_id = "Select the parent category.";
+  if (!draft.name.trim()) errors.name = "Category name is required.";
+  if (!draft.slug.trim()) errors.slug = "Slug is required.";
+  if (draft.slug && !isSlug(draft.slug)) errors.slug = "Use lowercase letters, numbers, and hyphens only.";
+  if (draft.sort_order && Number(draft.sort_order) < 0) errors.sort_order = "Menu order cannot be negative.";
+  return errors;
+}
+
+function validateCouponDraft(draft: CouponDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.code.trim()) errors.code = "Coupon code is required.";
+  if (draft.value === "" || Number(draft.value) <= 0) errors.value = "Discount value must be greater than 0.";
+  if (draft.type === "percentage" && Number(draft.value) > 100) errors.value = "Percentage discount cannot be over 100%.";
+  if (draft.usage_limit && (!Number.isInteger(Number(draft.usage_limit)) || Number(draft.usage_limit) < 1)) {
+    errors.usage_limit = "Usage limit must be a whole number.";
+  }
+  if (draft.starts_at && draft.ends_at && new Date(draft.ends_at) < new Date(draft.starts_at)) {
+    errors.ends_at = "End date must be after start date.";
+  }
+  return errors;
+}
+
+function validateShippingDraft(draft: ShippingDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.name.trim()) errors.name = "Shipping method name is required.";
+  if (draft.code && !isSlug(draft.code)) errors.code = "Use lowercase letters, numbers, and hyphens only.";
+  if (draft.fee === "" || Number(draft.fee) < 0) errors.fee = "Fee cannot be negative.";
+  if (draft.min_order_total && Number(draft.min_order_total) < 0) errors.min_order_total = "Minimum order cannot be negative.";
+  if (draft.sort_order && Number(draft.sort_order) < 0) errors.sort_order = "Sort order cannot be negative.";
+  return errors;
+}
+
+function validateRestockDraft(draft: RestockDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.quantity || Number(draft.quantity) <= 0 || !Number.isInteger(Number(draft.quantity))) {
+    errors.quantity = "Quantity must be a whole number greater than 0.";
+  }
+  if (!draft.note.trim()) errors.note = "Please add a reason note.";
+  return errors;
+}
+
+function validateBranchDraft(draft: BranchDraft) {
+  const errors: Record<string, string> = {};
+  if (!draft.name.trim()) errors.name = "Branch name is required.";
+  return errors;
+}
+
+function validateStaffDraft(draft: StaffDraft, editing: boolean) {
+  const errors: Record<string, string> = {};
+  if (!draft.name.trim()) errors.name = "Staff name is required.";
+  if (!draft.email.trim()) errors.email = "Email is required.";
+  if (draft.email && !isEmail(draft.email)) errors.email = "Enter a valid email address.";
+  if (!editing && draft.password.length < 8) errors.password = "Password must be at least 8 characters.";
+  if (editing && draft.password && draft.password.length < 8) errors.password = "New password must be at least 8 characters.";
+  return errors;
+}
+
+function isEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isSlug(value: string) {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 }
 
 function productFormData(draft: ProductDraft, files: File[]) {

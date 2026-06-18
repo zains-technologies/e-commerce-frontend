@@ -11,17 +11,14 @@ import { marketingService } from "@/services/marketingService";
 import { orderService } from "@/services/orderService";
 import { paymentService } from "@/services/paymentService";
 import type { CheckoutPayload } from "@/types/cart";
-import type { ShippingMethod } from "@/types/marketing";
 
 export default function CheckoutPage() {
   const { cart, loading } = useCart();
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [form, setForm] = useState<CheckoutPayload>({
     customer_name: "",
     customer_email: "",
     customer_phone: "",
     delivery_address: "",
-    shipping_method: "standard",
     order_notes: "",
     delivery_fee: 350,
     payment_method: "cod",
@@ -43,25 +40,31 @@ export default function CheckoutPage() {
   useEffect(() => {
     marketingService.shippingMethods()
       .then((methods) => {
-        setShippingMethods(methods);
         const first = methods[0];
         if (first) {
           setForm((current) => ({
             ...current,
-            shipping_method: first.code as CheckoutPayload["shipping_method"],
-            shipping_method_id: first.id,
             delivery_fee: Number(first.fee),
           }));
         }
       })
-      .catch(() => setShippingMethods([]));
+      .catch(() => undefined);
   }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const order = await orderService.checkout(form);
+      const checkoutPayload: CheckoutPayload = {
+        customer_name: form.customer_name,
+        customer_email: form.customer_email,
+        customer_phone: form.customer_phone,
+        delivery_address: form.delivery_address,
+        order_notes: form.order_notes,
+        payment_method: form.payment_method,
+        meta: form.meta,
+      };
+      const order = await orderService.checkout(checkoutPayload);
       const verification = {
         order_number: order.order_number,
         customer_email: form.customer_email,
@@ -106,28 +109,6 @@ export default function CheckoutPage() {
                 <Input required placeholder="Full name" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
                 <Input placeholder="Email" type="email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} />
                 <Input required placeholder="Phone" value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} />
-              </div>
-              <div>
-                <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Shipping method</p>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {(shippingMethods.length ? shippingMethods : [
-                    { id: 0, code: "standard", name: "Standard", fee: 350, is_active: true },
-                    { id: 0, code: "express", name: "Express", fee: 650, is_active: true },
-                    { id: 0, code: "pickup", name: "Store pickup", fee: 0, is_active: true },
-                  ]).map((method) => (
-                    <label key={method.code} className={`rounded-[20px] border p-4 text-sm font-bold ${form.shipping_method === method.code ? "border-black bg-black text-white" : "border-neutral-200"}`}>
-                      <input
-                        className="sr-only"
-                        type="radio"
-                        value={method.code}
-                        checked={form.shipping_method === method.code}
-                        onChange={() => setForm({ ...form, shipping_method: method.code as CheckoutPayload["shipping_method"], shipping_method_id: method.id || null, delivery_fee: Number(method.fee) })}
-                      />
-                      {method.name}
-                      <span className="mt-1 block text-xs opacity-70">{formatFee(Number(method.fee))}</span>
-                    </label>
-                  ))}
-                </div>
               </div>
               <textarea
                 required
@@ -185,8 +166,4 @@ export default function CheckoutPage() {
       </section>
     </Shell>
   );
-}
-
-function formatFee(fee: number) {
-  return fee > 0 ? `Delivery ${new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 0 }).format(fee)}` : "Free";
 }

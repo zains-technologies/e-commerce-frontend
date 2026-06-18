@@ -35,7 +35,7 @@ export interface CheckoutPayload {
   customer_email?: string;
   customer_phone?: string;
   delivery_address: string;
-  shipping_method?: "standard" | "express" | "pickup";
+  shipping_method?: string;
   shipping_method_id?: number | null;
   order_notes?: string;
   delivery_fee?: number;

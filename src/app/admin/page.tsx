@@ -947,7 +947,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
         requestDelete={setPendingCatalogDelete}
       />
       <Drawer open={drawerOpen} size="xwide" title={editing ? "Edit product" : "Add product"} subtitle="Upload 3 to 5 product images. Selecting new files while editing replaces the current images." onClose={() => setDrawerOpen(false)}>
-      <form onSubmit={submit} className="grid gap-5 pb-20">
+      <form onSubmit={submit} className="grid gap-5 pb-32">
         <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="grid min-w-0 gap-4">
             <DrawerSection title="Product basics">
@@ -1063,7 +1063,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
             )}
           </div>
         </div>
-        <div className="sticky bottom-0 z-20 -mx-5 flex gap-2 border-t border-neutral-100 bg-white/95 px-5 py-4 backdrop-blur md:-mx-7 md:px-7">
+        <div className="fixed bottom-0 right-0 z-[70] flex w-full max-w-[min(1480px,96vw)] gap-2 border-t border-neutral-100 bg-white/95 px-5 py-4 shadow-[0_-18px_40px_rgba(0,0,0,0.08)] backdrop-blur md:px-7">
           <Button disabled={busy}>{editing ? "Update product" : "Create product"}</Button>
           <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
         </div>

@@ -12,12 +12,13 @@ import { useCart } from "@/hooks/useCart";
 import { useProducts } from "@/hooks/useProducts";
 import { formatCurrency, getPrimaryImage } from "@/lib/utils";
 import { productService } from "@/services/productService";
-import type { Product, ProductVariant } from "@/types/product";
+import type { Product, ProductColor, ProductVariant } from "@/types/product";
 
 export default function ProductDetailPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
   const [product, setProduct] = useState<Product | null>(null);
+  const [catalogColors, setCatalogColors] = useState<ProductColor[]>([]);
   const [activeImage, setActiveImage] = useState("");
   const [variant, setVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -32,10 +33,13 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!slug) return;
-    productService
-      .getBySlug(slug)
-      .then((data) => {
+    Promise.all([
+      productService.getBySlug(slug),
+      productService.colors().catch(() => []),
+    ])
+      .then(([data, colors]) => {
         setProduct(data);
+        setCatalogColors(colors);
         setActiveImage(getPrimaryImage(data.images));
         setVariant(data.variants?.find((item) => item.stock_quantity > 0) || data.variants?.[0] || null);
       })
@@ -44,35 +48,37 @@ export default function ProductDetailPage() {
   }, [slug]);
 
   const variants = useMemo(() => product?.variants || [], [product]);
-  const hasStructuredVariants = useMemo(() => variants.some((item) => item.options?.size || item.options?.color_id), [variants]);
+  const hasStructuredVariants = useMemo(() => variants.some((item) => item.options?.size || item.options?.color_id || item.options?.color), [variants]);
   const price = useMemo(() => (product ? product.price + (variant?.price_adjustment || 0) : 0), [product, variant]);
-  const selectedColorId = variant?.options?.color_id ? Number(variant.options.color_id) : null;
-  const selectedSize = variant?.options?.size || "";
+  const selectedColorId = getVariantColorId(variant);
+  const selectedColorName = getVariantColorName(variant);
+  const selectedSize = String(variant?.options?.size || "");
   const activeStock = variant ? variant.stock_quantity : product?.stock_quantity || 0;
   const variantOptions = useMemo(() => variants.map((item) => ({ label: `${item.attribute_value} · ${item.stock_quantity} in stock`, value: String(item.id) })), [variants]);
   const sizeOptions = useMemo(() => {
     const sizeSet = new Set<string>();
     variants
-      .filter((item) => !selectedColorId || Number(item.options?.color_id) === selectedColorId)
+      .filter((item) => variantMatchesColor(item, selectedColorId, selectedColorName))
       .forEach((item) => {
-        if (item.options?.size) sizeSet.add(item.options.size);
+        if (item.options?.size) sizeSet.add(String(item.options.size));
       });
     return Array.from(sizeSet);
-  }, [selectedColorId, variants]);
-  const visibleColors = useMemo(() => (product?.colors || []).filter((color) => variants.some((item) => Number(item.options?.color_id) === color.id)), [product, variants]);
+  }, [selectedColorId, selectedColorName, variants]);
+  const visibleColors = useMemo(() => deriveVariantColors(product, variants, catalogColors), [catalogColors, product, variants]);
 
   function chooseColor(colorId: number) {
-    const nextVariant = variants.find((item) => Number(item.options?.color_id) === colorId && item.options?.size === selectedSize)
-      || variants.find((item) => Number(item.options?.color_id) === colorId && item.stock_quantity > 0)
-      || variants.find((item) => Number(item.options?.color_id) === colorId)
+    const color = visibleColors.find((item) => item.id === colorId);
+    const nextVariant = variants.find((item) => variantMatchesColor(item, colorId, color?.name) && String(item.options?.size || "") === selectedSize)
+      || variants.find((item) => variantMatchesColor(item, colorId, color?.name) && item.stock_quantity > 0)
+      || variants.find((item) => variantMatchesColor(item, colorId, color?.name))
       || null;
     setVariant(nextVariant);
     if (nextVariant?.stock_quantity) setQuantity((value) => Math.min(value, nextVariant.stock_quantity));
   }
 
   function chooseSize(size: string) {
-    const nextVariant = variants.find((item) => item.options?.size === size && (!selectedColorId || Number(item.options?.color_id) === selectedColorId))
-      || variants.find((item) => item.options?.size === size)
+    const nextVariant = variants.find((item) => String(item.options?.size || "") === size && variantMatchesColor(item, selectedColorId, selectedColorName))
+      || variants.find((item) => String(item.options?.size || "") === size)
       || null;
     setVariant(nextVariant);
     if (nextVariant?.stock_quantity) setQuantity((value) => Math.min(value, nextVariant.stock_quantity));
@@ -130,8 +136,8 @@ export default function ProductDetailPage() {
                     <p className="text-xs font-bold uppercase text-neutral-500">Color</p>
                     <div className="flex flex-wrap gap-3">
                       {visibleColors.map((color) => {
-                        const colorStock = variants.filter((item) => Number(item.options?.color_id) === color.id).reduce((sum, item) => sum + item.stock_quantity, 0);
-                        const selected = selectedColorId === color.id;
+                        const colorStock = variants.filter((item) => variantMatchesColor(item, color.id, color.name)).reduce((sum, item) => sum + item.stock_quantity, 0);
+                        const selected = selectedColorId === color.id || (!selectedColorId && selectedColorName.toLowerCase() === color.name.toLowerCase());
 
                         return (
                           <button
@@ -154,7 +160,7 @@ export default function ProductDetailPage() {
                     <p className="text-xs font-bold uppercase text-neutral-500">Size</p>
                     <div className="flex flex-wrap gap-2">
                       {sizeOptions.map((size) => {
-                        const sizeVariant = variants.find((item) => item.options?.size === size && (!selectedColorId || Number(item.options?.color_id) === selectedColorId));
+                        const sizeVariant = variants.find((item) => String(item.options?.size || "") === size && variantMatchesColor(item, selectedColorId, selectedColorName));
                         const disabled = !sizeVariant || sizeVariant.stock_quantity <= 0;
 
                         return (
@@ -288,6 +294,63 @@ export default function ProductDetailPage() {
       </section>
     </Shell>
   );
+}
+
+function getVariantColorId(variant?: ProductVariant | null) {
+  const rawColorId = variant?.options?.color_id;
+  const colorId = Number(rawColorId);
+  return Number.isFinite(colorId) && colorId > 0 ? colorId : null;
+}
+
+function getVariantColorName(variant?: ProductVariant | null) {
+  return String(variant?.options?.color || "").trim();
+}
+
+function variantMatchesColor(variant: ProductVariant, colorId?: number | null, colorName = "") {
+  if (!colorId && !colorName) return true;
+
+  const variantColorId = getVariantColorId(variant);
+  if (colorId && variantColorId === colorId) return true;
+
+  const variantColorName = getVariantColorName(variant).toLowerCase();
+  return Boolean(colorName && variantColorName && variantColorName === colorName.toLowerCase());
+}
+
+function deriveVariantColors(product: Product | null, variants: ProductVariant[], catalogColors: ProductColor[]) {
+  const colorMap = new Map<number, ProductColor>();
+
+  [...(product?.colors || []), ...catalogColors].forEach((color) => {
+    const hasVariant = variants.some((variant) => variantMatchesColor(variant, color.id, color.name));
+    if (hasVariant) colorMap.set(color.id, color);
+  });
+
+  variants.forEach((variant) => {
+    const colorId = getVariantColorId(variant);
+    const colorName = getVariantColorName(variant);
+    if (!colorName && !colorId) return;
+
+    const existing = colorId ? colorMap.get(colorId) || catalogColors.find((color) => color.id === colorId) : catalogColors.find((color) => color.name.toLowerCase() === colorName.toLowerCase());
+    if (existing) {
+      colorMap.set(existing.id, existing);
+      return;
+    }
+
+    if (colorName) {
+      const syntheticId = colorId || -Math.abs(hashColorName(colorName));
+      colorMap.set(syntheticId, {
+        id: syntheticId,
+        name: colorName,
+        slug: colorName.toLowerCase().replace(/\s+/g, "-"),
+        hex_code: "#111111",
+      });
+    }
+  });
+
+  return Array.from(colorMap.values());
+}
+
+function hashColorName(value: string) {
+  return value.split("").reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0) || 1;
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (value: number) => void }) {

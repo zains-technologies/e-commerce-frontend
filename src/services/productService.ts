@@ -1,6 +1,6 @@
 import { API_ROUTES } from "@/constants/apiRoutes";
 import { apiRequest, type PaginatedResponse, type SingleResponse } from "./api";
-import type { Product } from "@/types/product";
+import type { Product, ProductColor } from "@/types/product";
 
 export const productService = {
   async list() {
@@ -11,6 +11,11 @@ export const productService = {
   async getBySlug(slug: string) {
     const response = await apiRequest<SingleResponse<Product>>(`${API_ROUTES.PRODUCTS}/${slug}`);
     return response.data;
+  },
+
+  async colors() {
+    const response = await apiRequest<SingleResponse<ProductColor[]> | PaginatedResponse<ProductColor>>(API_ROUTES.COLORS);
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   async submitReview(productId: number, payload: { customer_name: string; customer_email?: string; rating: number; comment?: string }) {

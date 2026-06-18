@@ -11,7 +11,7 @@ export interface ProductVariant {
   id: number;
   attribute_name: string;
   attribute_value: string;
-  options?: Record<string, string> | null;
+  options?: Record<string, string | number | null | undefined> | null;
   price_adjustment: number;
   stock_quantity: number;
   sku?: string | null;

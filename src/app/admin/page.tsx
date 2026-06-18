@@ -17,6 +17,8 @@ import {
 import {
   Building2,
   ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   FolderTree,
   Gauge,
@@ -27,8 +29,6 @@ import {
   Megaphone,
   MessageSquare,
   Package,
-  PanelLeftClose,
-  PanelLeftOpen,
   Percent,
   ScrollText,
   Truck,
@@ -332,7 +332,16 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
   return (
     <main className="min-h-screen bg-[#f6f6f3] text-black">
       <div className={cn("grid min-h-screen transition-[grid-template-columns] duration-300 ease-out", sidebarCollapsed ? "lg:grid-cols-[88px_1fr]" : "lg:grid-cols-[280px_1fr]")}>
-        <aside className="hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
+        <aside className="relative hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
+          <button
+            type="button"
+            className="absolute -right-4 top-24 z-50 grid size-8 place-items-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition hover:border-black hover:text-black"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+          </button>
           <div className={cn("border-b border-neutral-100 py-5 transition-all duration-300", sidebarCollapsed ? "px-4" : "px-6")}>
             <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
               <Link href="/admin" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-black text-white">
@@ -362,15 +371,6 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
             ))}
           </nav>
           <div className="border-t border-neutral-100 p-4">
-            <button
-              type="button"
-              className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-neutral-200 text-xs font-bold uppercase transition hover:border-black"
-              onClick={() => setSidebarCollapsed((value) => !value)}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-              <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-24 opacity-100")}>Collapse</span>
-            </button>
             <div className={cn("overflow-hidden rounded-[24px] bg-[#d8dfcc] transition-all duration-300", sidebarCollapsed ? "max-h-0 p-0 opacity-0" : "max-h-40 p-4 opacity-100")}>
               <p className="text-xs font-bold uppercase text-black/60">Active workspace</p>
               <p className="mt-2 text-lg font-black">{data.store?.name || "Platform Admin"}</p>

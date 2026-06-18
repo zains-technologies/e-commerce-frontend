@@ -947,43 +947,69 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
         requestDelete={setPendingCatalogDelete}
       />
       <Drawer open={drawerOpen} size="wide" title={editing ? "Edit product" : "Add product"} subtitle="Upload 3 to 5 product images. Selecting new files while editing replaces the current images." onClose={() => setDrawerOpen(false)}>
-      <form onSubmit={submit} className="grid gap-5">
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="grid gap-3">
-        <div>
-          <Dropdown value={draft.category_id} options={categoryOptions(categories)} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
-          {errors.category_id && <p className="mt-1.5 px-4 text-xs font-bold text-red-600">{errors.category_id}</p>}
-        </div>
-        <Dropdown value={draft.brand_id} options={[{ label: "No brand", value: "" }, ...brands.map((brand) => ({ label: brand.name, value: String(brand.id) }))]} placeholder="Select brand" onChange={(value) => setDraft({ ...draft, brand_id: value })} />
-        <Dropdown value={draft.size_guide_id} options={[{ label: "No size guide", value: "" }, ...sizeGuides.map((guide) => ({ label: guide.name, value: String(guide.id) }))]} placeholder="Select size guide" onChange={(value) => setDraft({ ...draft, size_guide_id: value })} />
-        <Input required placeholder="Product name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <Input required placeholder="Slug" value={draft.slug} error={errors.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
-        <Input placeholder="SKU" value={draft.sku} error={errors.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} />
-        <Input required placeholder="Price" type="number" value={draft.price} error={errors.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
-        <Input placeholder="Cost price" type="number" value={draft.cost_price} error={errors.cost_price} onChange={(e) => setDraft({ ...draft, cost_price: e.target.value })} />
-        <Input required placeholder="Stock quantity" type="number" value={draft.stock_quantity} error={errors.stock_quantity} onChange={(e) => setDraft({ ...draft, stock_quantity: e.target.value })} />
-        <Dropdown value={draft.status} options={productStatusOptions} onChange={(value) => setDraft({ ...draft, status: value })} />
-        <textarea className="min-h-24 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-        <Input placeholder="SEO title" value={draft.seo_title} onChange={(e) => setDraft({ ...draft, seo_title: e.target.value })} />
-        <textarea className="min-h-20 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none" placeholder="SEO description" value={draft.seo_description} onChange={(e) => setDraft({ ...draft, seo_description: e.target.value })} />
-        <Input placeholder="SEO keywords, comma separated" value={draft.seo_keywords} onChange={(e) => setDraft({ ...draft, seo_keywords: e.target.value })} />
-        <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm">
-          <input type="checkbox" checked={draft.is_featured} onChange={(e) => setDraft({ ...draft, is_featured: e.target.checked })} />
-          Featured
-        </label>
-        <CatalogMultiSelect title="Tags" items={tags} selected={draft.tag_ids} onChange={(tag_ids) => setDraft({ ...draft, tag_ids })} />
-        <CatalogMultiSelect title="Collections" items={collections} selected={draft.collection_ids} onChange={(collection_ids) => setDraft({ ...draft, collection_ids })} />
-        <ColorMultiSelect colors={colors} selected={draft.color_ids} onChange={(color_ids) => setDraft({ ...draft, color_ids })} />
-        <CatalogMultiSelect title="Related products" items={allProducts.filter((item) => item.id !== draft.id)} selected={draft.related_product_ids} onChange={(related_product_ids) => setDraft({ ...draft, related_product_ids })} />
-        <textarea
-          className="min-h-28 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none"
-          placeholder={"Specifications, one per line\nFabric: Cotton\nFit: Regular"}
-          value={draft.specifications_text}
-          onChange={(e) => setDraft({ ...draft, specifications_text: e.target.value })}
-        />
-        <VariantBuilder basePrice={Number(draft.price || 0)} colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
+      <form onSubmit={submit} className="grid gap-5 pb-20">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid min-w-0 gap-4">
+            <DrawerSection title="Product basics">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Dropdown value={draft.category_id} options={categoryOptions(categories)} placeholder="Select category" onChange={(value) => setDraft({ ...draft, category_id: value })} />
+                  {errors.category_id && <p className="mt-1.5 px-4 text-xs font-bold text-red-600">{errors.category_id}</p>}
+                </div>
+                <Dropdown value={draft.brand_id} options={[{ label: "No brand", value: "" }, ...brands.map((brand) => ({ label: brand.name, value: String(brand.id) }))]} placeholder="Select brand" onChange={(value) => setDraft({ ...draft, brand_id: value })} />
+                <Input required placeholder="Product name" value={draft.name} error={errors.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                <Input required placeholder="Slug" value={draft.slug} error={errors.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} />
+                <Input placeholder="SKU" value={draft.sku} error={errors.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} />
+                <Dropdown value={draft.status} options={productStatusOptions} onChange={(value) => setDraft({ ...draft, status: value })} />
+              </div>
+              <textarea className="mt-3 min-h-24 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="Description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+              <label className="mt-3 flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm">
+                <input type="checkbox" checked={draft.is_featured} onChange={(e) => setDraft({ ...draft, is_featured: e.target.checked })} />
+                Featured product
+              </label>
+            </DrawerSection>
+
+            <DrawerSection title="Pricing and stock">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Input required placeholder="Base price" type="number" value={draft.price} error={errors.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
+                <Input placeholder="Cost price" type="number" value={draft.cost_price} error={errors.cost_price} onChange={(e) => setDraft({ ...draft, cost_price: e.target.value })} />
+                <Input required placeholder={draft.variant_rows.length ? "Auto from variants" : "Stock quantity"} type="number" value={draft.stock_quantity} error={errors.stock_quantity} onChange={(e) => setDraft({ ...draft, stock_quantity: e.target.value })} />
+              </div>
+              {draft.variant_rows.length ? <p className="mt-2 text-xs text-neutral-500">Product stock will be calculated from variant stock when saved.</p> : null}
+            </DrawerSection>
+
+            <DrawerSection title="Catalog setup">
+              <div className="grid gap-3">
+                <Dropdown value={draft.size_guide_id} options={[{ label: "No size guide", value: "" }, ...sizeGuides.map((guide) => ({ label: guide.name, value: String(guide.id) }))]} placeholder="Select size guide" onChange={(value) => setDraft({ ...draft, size_guide_id: value })} />
+                <CatalogMultiSelect title="Tags" items={tags} selected={draft.tag_ids} onChange={(tag_ids) => setDraft({ ...draft, tag_ids })} />
+                <CatalogMultiSelect title="Collections" items={collections} selected={draft.collection_ids} onChange={(collection_ids) => setDraft({ ...draft, collection_ids })} />
+                <ColorMultiSelect colors={colors} selected={draft.color_ids} onChange={(color_ids) => setDraft({ ...draft, color_ids })} />
+                <CatalogMultiSelect title="Related products" items={allProducts.filter((item) => item.id !== draft.id)} selected={draft.related_product_ids} onChange={(related_product_ids) => setDraft({ ...draft, related_product_ids })} />
+              </div>
+            </DrawerSection>
+
+            <DrawerSection title="Specifications">
+              <textarea
+                className="min-h-28 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black"
+                placeholder={"Specifications, one per line\nFabric: Cotton\nFit: Regular"}
+                value={draft.specifications_text}
+                onChange={(e) => setDraft({ ...draft, specifications_text: e.target.value })}
+              />
+            </DrawerSection>
+
+            <DrawerSection title="Variants" className="overflow-visible">
+              <VariantBuilder basePrice={Number(draft.price || 0)} colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
+            </DrawerSection>
+
+            <DrawerSection title="SEO">
+              <div className="grid gap-3">
+                <Input placeholder="SEO title" value={draft.seo_title} onChange={(e) => setDraft({ ...draft, seo_title: e.target.value })} />
+                <textarea className="min-h-20 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" placeholder="SEO description" value={draft.seo_description} onChange={(e) => setDraft({ ...draft, seo_description: e.target.value })} />
+                <Input placeholder="SEO keywords, comma separated" value={draft.seo_keywords} onChange={(e) => setDraft({ ...draft, seo_keywords: e.target.value })} />
+              </div>
+            </DrawerSection>
           </div>
-          <div className="rounded-[28px] border border-neutral-200 bg-neutral-50 p-4">
+          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4 xl:sticky xl:top-5">
             <p className="text-xs font-bold uppercase text-neutral-500">Product images</p>
             {editingProduct?.images?.length ? (
               <div className="mt-3">
@@ -1037,7 +1063,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="sticky bottom-0 z-20 -mx-5 flex gap-2 border-t border-neutral-100 bg-white/95 px-5 py-4 backdrop-blur md:-mx-7 md:px-7">
           <Button disabled={busy}>{editing ? "Update product" : "Create product"}</Button>
           <Button type="button" variant="outline" onClick={() => setDrawerOpen(false)}>Cancel</Button>
         </div>
@@ -1122,7 +1148,7 @@ function CatalogMultiSelect({
   }
 
   return (
-    <div className="rounded-[24px] border border-neutral-200 p-4">
+    <div className="rounded-[20px] border border-neutral-100 bg-neutral-50 p-3">
       <p className="mb-3 text-xs font-bold uppercase text-neutral-500">{title}</p>
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
@@ -1137,6 +1163,15 @@ function CatalogMultiSelect({
         ))}
       </div>
     </div>
+  );
+}
+
+function DrawerSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={cn("rounded-[24px] border border-neutral-200 bg-white p-4", className)}>
+      <p className="mb-3 text-xs font-bold uppercase text-neutral-500">{title}</p>
+      {children}
+    </section>
   );
 }
 
@@ -1162,7 +1197,7 @@ function ColorMultiSelect({
   }
 
   return (
-    <div className="rounded-[24px] border border-neutral-200 p-4">
+    <div className="rounded-[20px] border border-neutral-100 bg-neutral-50 p-3">
       <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Product colors</p>
       <div className="flex flex-wrap gap-2">
         {colors.map((color) => (
@@ -1231,7 +1266,7 @@ function VariantBuilder({
   }
 
   return (
-    <div className="rounded-[24px] border border-neutral-200 p-4">
+    <div className="grid gap-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase text-neutral-500">Variant combinations</p>
@@ -1239,7 +1274,7 @@ function VariantBuilder({
         </div>
         <Button type="button" variant="outline" className="h-9 px-4" onClick={addRow}>Add variant</Button>
       </div>
-      <div className="mb-4 grid gap-3 rounded-[20px] bg-neutral-50 p-3">
+      <div className="grid gap-3 rounded-[20px] bg-neutral-50 p-3">
         <div>
           <p className="mb-2 text-[11px] font-bold uppercase text-neutral-500">Sizes</p>
           <div className="flex flex-wrap gap-2">
@@ -1284,7 +1319,7 @@ function VariantBuilder({
       </div>
       <div className="grid gap-3">
         {rows.map((row) => (
-          <div key={row.id} className="grid gap-2 rounded-[18px] bg-white p-3 ring-1 ring-neutral-100 md:grid-cols-[1fr_1fr_1fr_.8fr_.8fr_auto]">
+          <div key={row.id} className="grid gap-2 rounded-[18px] bg-neutral-50 p-3 md:grid-cols-2 xl:grid-cols-[110px_180px_minmax(140px,1fr)_120px_110px_auto]">
             <Dropdown size="sm" value={row.size} options={sizeVariantOptions} onChange={(size) => updateRow(row.id, { size })} />
             <Dropdown size="sm" value={row.color_id} options={colorOptions} onChange={(color_id) => updateRow(row.id, { color_id })} />
             <Input placeholder="Variant SKU" value={row.sku} onChange={(event) => updateRow(row.id, { sku: event.target.value })} />

@@ -25,7 +25,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (options.cart) {
     headers.set("X-Cart-Session", getCartSession());
-    headers.set("X-Store-Domain", "localhost");
+    headers.set("X-Store-Domain", getStoreDomain());
   }
 
   // Laravel API connection happens here. Change NEXT_PUBLIC_API_BASE_URL per client/store.
@@ -54,3 +54,15 @@ export type SingleResponse<T> = {
   success?: boolean;
   data: T;
 };
+
+function getStoreDomain() {
+  if (process.env.NEXT_PUBLIC_STORE_DOMAIN) {
+    return process.env.NEXT_PUBLIC_STORE_DOMAIN;
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.hostname;
+  }
+
+  return "localhost";
+}

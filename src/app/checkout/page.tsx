@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { EmptyState, ErrorState, LoadingState } from "@/components/common/StateBlock";
@@ -9,6 +9,7 @@ import { Shell } from "@/components/layout/Shell";
 import { useCart } from "@/hooks/useCart";
 import { marketingService } from "@/services/marketingService";
 import { orderService } from "@/services/orderService";
+import { paymentService } from "@/services/paymentService";
 import type { CheckoutPayload } from "@/types/cart";
 import type { ShippingMethod } from "@/types/marketing";
 
@@ -27,7 +28,17 @@ export default function CheckoutPage() {
   });
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bankReference, setBankReference] = useState("");
+  const [bankReceipt, setBankReceipt] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const displayCart = useMemo(() => ({
+    ...cart,
+    totals: {
+      ...cart.totals,
+      delivery_fee: Number(form.delivery_fee || 0),
+      total: Math.max(0, cart.totals.subtotal - cart.totals.discount + Number(form.delivery_fee || 0)),
+    },
+  }), [cart, form.delivery_fee]);
 
   useEffect(() => {
     marketingService.shippingMethods()
@@ -51,7 +62,27 @@ export default function CheckoutPage() {
     setBusy(true);
     try {
       const order = await orderService.checkout(form);
-      setStatus(`Order placed successfully: ${order.order_number}`);
+      const verification = {
+        order_number: order.order_number,
+        customer_email: form.customer_email,
+        customer_phone: form.customer_phone,
+      };
+
+      if (form.payment_method === "payhere") {
+        setStatus("Redirecting to PayHere secure checkout...");
+        const payload = await paymentService.initiatePayHere(verification);
+        paymentService.submitPayHere(payload);
+        return;
+      }
+
+      if (form.payment_method === "bank_transfer") {
+        await paymentService.createBankTransfer({ ...verification, reference: bankReference, receipt: bankReceipt });
+        setStatus(`Order ${order.order_number} is waiting for bank transfer review.`);
+      } else {
+        await paymentService.confirmCod(verification);
+        setStatus(`Order ${order.order_number} confirmed for cash on delivery.`);
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
@@ -68,14 +99,13 @@ export default function CheckoutPage() {
         {!loading && cart.items.length === 0 && <div className="mt-8"><EmptyState message="Your cart is empty. Add items before checkout." /></div>}
         {!loading && cart.items.length > 0 && (
           <div className="mt-8 grid gap-8 md:grid-cols-[1fr_360px]">
-            <form onSubmit={submit} className="space-y-6 rounded-[28px] border border-neutral-200 p-5">
+            <form id="checkout-form" onSubmit={submit} className="space-y-6 rounded-[28px] border border-neutral-200 p-5">
               {error && <ErrorState message={error} />}
               {status && <div className="rounded-[20px] bg-green-50 p-4 text-sm font-bold text-green-700">{status}</div>}
               <div className="grid gap-4 md:grid-cols-2">
                 <Input required placeholder="Full name" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
                 <Input placeholder="Email" type="email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} />
                 <Input required placeholder="Phone" value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} />
-                <Input placeholder="Delivery fee" type="number" value={form.delivery_fee} onChange={(e) => setForm({ ...form, delivery_fee: Number(e.target.value) })} />
               </div>
               <div>
                 <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Shipping method</p>
@@ -127,9 +157,29 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               </div>
+              {form.payment_method === "bank_transfer" && (
+                <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4">
+                  <p className="text-sm font-bold">Bank transfer details</p>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500">Add the transfer reference now, or upload a receipt so the admin can verify it from Payments.</p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <Input placeholder="Transfer reference" value={bankReference} onChange={(e) => setBankReference(e.target.value)} />
+                    <Input type="file" accept="image/*,.pdf" onChange={(e) => setBankReceipt(e.target.files?.[0] || null)} />
+                  </div>
+                </div>
+              )}
+              {form.payment_method === "payhere" && (
+                <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
+                  You will be redirected to PayHere secure checkout after the order is created.
+                </div>
+              )}
               <Button disabled={busy} className="w-full">{busy ? "Placing order..." : "Place order"}</Button>
             </form>
-            <OrderSummary cart={cart} actionLabel="Place order" disabled={busy} />
+            <OrderSummary
+              cart={displayCart}
+              actionLabel={busy ? "Placing order..." : "Place order"}
+              disabled={busy}
+              onAction={() => (document.getElementById("checkout-form") as HTMLFormElement | null)?.requestSubmit()}
+            />
           </div>
         )}
       </section>

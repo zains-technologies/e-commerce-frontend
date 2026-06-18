@@ -19,14 +19,17 @@ export function Drawer({
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "xwide";
 }) {
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50">
       <button className="animate-fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]" aria-label="Close drawer" onClick={onClose} />
-      <aside className={cn("animate-drawer-in absolute right-0 top-0 flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:rounded-l-[32px]", size === "wide" ? "max-w-[min(1180px,94vw)]" : "max-w-xl")}>
+      <aside className={cn(
+        "animate-drawer-in absolute right-0 top-0 flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl md:rounded-l-[32px]",
+        size === "xwide" ? "max-w-[min(1480px,96vw)]" : size === "wide" ? "max-w-[min(1180px,94vw)]" : "max-w-xl",
+      )}>
         <div className="shrink-0 border-b border-neutral-100 px-5 py-4 md:px-7 md:py-5">
           <div className="flex items-start justify-between gap-4">
             <div>

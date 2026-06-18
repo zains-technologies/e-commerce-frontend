@@ -946,9 +946,9 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
         createItem={createCatalogItem}
         requestDelete={setPendingCatalogDelete}
       />
-      <Drawer open={drawerOpen} size="wide" title={editing ? "Edit product" : "Add product"} subtitle="Upload 3 to 5 product images. Selecting new files while editing replaces the current images." onClose={() => setDrawerOpen(false)}>
+      <Drawer open={drawerOpen} size="xwide" title={editing ? "Edit product" : "Add product"} subtitle="Upload 3 to 5 product images. Selecting new files while editing replaces the current images." onClose={() => setDrawerOpen(false)}>
       <form onSubmit={submit} className="grid gap-5 pb-20">
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="grid min-w-0 gap-4">
             <DrawerSection title="Product basics">
               <div className="grid gap-3 md:grid-cols-2">
@@ -1009,7 +1009,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
               </div>
             </DrawerSection>
           </div>
-          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4 xl:sticky xl:top-5">
+          <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4 2xl:sticky 2xl:top-5">
             <p className="text-xs font-bold uppercase text-neutral-500">Product images</p>
             {editingProduct?.images?.length ? (
               <div className="mt-3">
@@ -1231,7 +1231,7 @@ function VariantBuilder({
   const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
   const [defaultStock, setDefaultStock] = useState("0");
   const [defaultPriceAdjustment, setDefaultPriceAdjustment] = useState("0");
-  const colorOptions = [{ label: "Choose color", value: "" }, ...colors.map((color) => ({ label: color.name, value: String(color.id) }))];
+  const colorOptions = [{ label: "Choose color", value: "" }, ...colors.map((color) => ({ label: color.name, value: String(color.id), swatch: color.hex_code }))];
   const selectedColors = selectedColorIds.length ? selectedColorIds : colors.length ? colors.map((color) => String(color.id)) : [""];
   const totalStock = rows.reduce((sum, row) => sum + Number(row.stock_quantity || 0), 0);
 
@@ -1310,7 +1310,11 @@ function VariantBuilder({
               })}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-[18px] border border-dashed border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-500">
+            Add colors in Product CRUD before generating color variants.
+          </div>
+        )}
         <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
           <Input placeholder="Default stock" type="number" value={defaultStock} onChange={(event) => setDefaultStock(event.target.value)} />
           <Input placeholder="+ price per variant" type="number" value={defaultPriceAdjustment} onChange={(event) => setDefaultPriceAdjustment(event.target.value)} />
@@ -1319,9 +1323,9 @@ function VariantBuilder({
       </div>
       <div className="grid gap-3">
         {rows.map((row) => (
-          <div key={row.id} className="grid gap-2 rounded-[18px] bg-neutral-50 p-3 md:grid-cols-2 xl:grid-cols-[110px_180px_minmax(140px,1fr)_120px_110px_auto]">
+          <div key={row.id} className="grid gap-2 rounded-[18px] bg-neutral-50 p-3 md:grid-cols-2 2xl:grid-cols-[110px_220px_minmax(180px,1fr)_130px_120px_auto]">
             <Dropdown size="sm" value={row.size} options={sizeVariantOptions} onChange={(size) => updateRow(row.id, { size })} />
-            <Dropdown size="sm" value={row.color_id} options={colorOptions} onChange={(color_id) => updateRow(row.id, { color_id })} />
+            <Dropdown size="sm" value={row.color_id} options={colorOptions} disabled={!colors.length} placeholder={colors.length ? "Choose color" : "Add colors first"} onChange={(color_id) => updateRow(row.id, { color_id })} />
             <Input placeholder="Variant SKU" value={row.sku} onChange={(event) => updateRow(row.id, { sku: event.target.value })} />
             <div>
               <Input placeholder="+ price" type="number" value={row.price_adjustment} onChange={(event) => updateRow(row.id, { price_adjustment: event.target.value })} />

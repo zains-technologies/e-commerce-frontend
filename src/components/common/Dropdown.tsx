@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export type DropdownOption = {
   label: string;
   value: string;
+  swatch?: string;
 };
 
 export function Dropdown({
@@ -53,7 +54,10 @@ export function Dropdown({
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className={cn("truncate", selected ? "text-black" : "text-neutral-400")}>{selected?.label || placeholder}</span>
+        <span className={cn("flex min-w-0 items-center gap-2", selected ? "text-black" : "text-neutral-400")}>
+          {selected?.swatch && <span className="size-4 shrink-0 rounded-full border border-neutral-300 shadow-inner" style={{ backgroundColor: selected.swatch }} />}
+          <span className="truncate">{selected?.label || placeholder}</span>
+        </span>
         <ChevronIcon open={open} />
       </button>
       {open && (
@@ -76,7 +80,10 @@ export function Dropdown({
                   setOpen(false);
                 }}
               >
-                <span>{option.label}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {option.swatch && <span className="size-4 shrink-0 rounded-full border border-neutral-300 shadow-inner" style={{ backgroundColor: option.swatch }} />}
+                  <span className="truncate">{option.label}</span>
+                </span>
                 {active && <CheckMiniIcon />}
               </button>
             );

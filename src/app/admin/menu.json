@@ -1,0 +1,121 @@
+[
+  {
+    "key": "overview",
+    "name": "Overview",
+    "path": "/admin",
+    "icon": "Gauge",
+    "description": "Performance, sales, and daily store health."
+  },
+  {
+    "key": "store",
+    "name": "Store",
+    "path": "/admin/store",
+    "icon": "Store",
+    "description": "Tenant settings, plan, domain, contact, and theme."
+  },
+  {
+    "key": "products",
+    "name": "Products",
+    "path": "/admin/products",
+    "icon": "Package",
+    "description": "Catalog management with images, stock, and pricing."
+  },
+  {
+    "key": "categories",
+    "name": "Categories",
+    "path": "/admin/categories",
+    "icon": "FolderTree",
+    "description": "Category structure and storefront browsing."
+  },
+  {
+    "key": "orders",
+    "name": "Orders",
+    "path": "/admin/orders",
+    "icon": "ShoppingBag",
+    "description": "Fulfillment, statuses, and customer order activity."
+  },
+  {
+    "key": "coupons",
+    "name": "Coupons",
+    "path": "/admin/coupons",
+    "icon": "Percent",
+    "description": "Discount campaigns for mid and pro stores."
+  },
+  {
+    "key": "reviews",
+    "name": "Reviews",
+    "path": "/admin/reviews",
+    "icon": "MessageSquare",
+    "description": "Approve, reject, and moderate customer product reviews."
+  },
+  {
+    "key": "questions",
+    "name": "Questions",
+    "path": "/admin/questions",
+    "icon": "MessageSquare",
+    "description": "Answer product questions before showing them publicly."
+  },
+  {
+    "key": "reports",
+    "name": "Reports",
+    "path": "/admin/reports",
+    "icon": "ChartNoAxesCombined",
+    "description": "Sales, profit, and best-selling product insights."
+  },
+  {
+    "key": "payments",
+    "name": "Payments",
+    "path": "/admin/payments",
+    "icon": "CreditCard",
+    "description": "COD, bank transfer, and payment status review."
+  },
+  {
+    "key": "shipping",
+    "name": "Shipping",
+    "path": "/admin/shipping",
+    "icon": "Truck",
+    "description": "Delivery methods and customer checkout fees."
+  },
+  {
+    "key": "marketing",
+    "name": "Marketing",
+    "path": "/admin/marketing",
+    "icon": "Megaphone",
+    "description": "Storefront banners, hero content, and promotional notices."
+  },
+  {
+    "key": "newsletter",
+    "name": "Newsletter",
+    "path": "/admin/newsletter",
+    "icon": "Mail",
+    "description": "Newsletter subscribers and subscription health."
+  },
+  {
+    "key": "inventory",
+    "name": "Inventory",
+    "path": "/admin/inventory",
+    "icon": "Layers3",
+    "description": "Low-stock monitoring and inventory movement logs."
+  },
+  {
+    "key": "branches",
+    "name": "Branches",
+    "path": "/admin/branches",
+    "icon": "Building2",
+    "description": "Multi-branch configuration for pro stores."
+  },
+  {
+    "key": "staff",
+    "name": "Staff",
+    "path": "/admin/staff",
+    "icon": "Users",
+    "description": "Admin, manager, and staff user access."
+  },
+  {
+    "key": "audit",
+    "name": "Audit Logs",
+    "path": "/admin/audit",
+    "icon": "ScrollText",
+    "description": "Admin activity and platform change history."
+  }
+]

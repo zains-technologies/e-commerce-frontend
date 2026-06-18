@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, ComponentType, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -27,6 +27,8 @@ import {
   Megaphone,
   MessageSquare,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Percent,
   ScrollText,
   Truck,
@@ -40,7 +42,7 @@ import { Button } from "@/components/common/Button";
 import { Dropdown } from "@/components/common/Dropdown";
 import { Input } from "@/components/common/Input";
 import { EmptyState, ErrorState } from "@/components/common/StateBlock";
-import { useAdmin } from "@/hooks/useAdmin";
+import { useAdmin, type AdminSection } from "@/hooks/useAdmin";
 import { cn, formatCurrency, getPrimaryImage } from "@/lib/utils";
 import { adminService } from "@/services/adminService";
 import { authService } from "@/services/authService";
@@ -48,89 +50,42 @@ import type { Branch, Coupon, Order, Payment, StaffUser, StoreSettings } from "@
 import type { Category } from "@/types/category";
 import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductColor, ProductQuestion, ProductVariant, SizeGuide } from "@/types/product";
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
+import rawMenuItems from "./menu.json";
 
-const tabs = ["overview", "store", "products", "categories", "orders", "coupons", "reviews", "questions", "reports", "payments", "shipping", "marketing", "newsletter", "inventory", "branches", "staff", "audit"] as const;
-type Tab = (typeof tabs)[number];
+type Tab = AdminSection;
+type IconName = "Building2" | "ChartNoAxesCombined" | "CreditCard" | "FolderTree" | "Gauge" | "Layers3" | "Mail" | "Megaphone" | "MessageSquare" | "Package" | "Percent" | "ScrollText" | "ShoppingBag" | "Store" | "Truck" | "Users";
+type MenuItem = { key: Tab; name: string; path: string; icon: IconName; description: string };
 
-const tabLabels: Record<Tab, string> = {
-  overview: "Overview",
-  store: "Store",
-  products: "Products",
-  categories: "Categories",
-  orders: "Orders",
-  coupons: "Coupons",
-  reviews: "Reviews",
-  questions: "Questions",
-  reports: "Reports",
-  payments: "Payments",
-  shipping: "Shipping",
-  marketing: "Marketing",
-  newsletter: "Newsletter",
-  inventory: "Inventory",
-  branches: "Branches",
-  staff: "Staff",
-  audit: "Audit Logs",
+const menuItems = rawMenuItems as MenuItem[];
+const tabs = menuItems.map((item) => item.key);
+const tabLabels = Object.fromEntries(menuItems.map((item) => [item.key, item.name])) as Record<Tab, string>;
+const tabHref = Object.fromEntries(menuItems.map((item) => [item.key, item.path])) as Record<Tab, string>;
+const tabDescriptions = Object.fromEntries(menuItems.map((item) => [item.key, item.description])) as Record<Tab, string>;
+const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
+  Building2,
+  ChartNoAxesCombined,
+  CreditCard,
+  FolderTree,
+  Gauge,
+  Layers3,
+  Mail,
+  Megaphone,
+  MessageSquare,
+  Package,
+  Percent,
+  ScrollText,
+  ShoppingBag,
+  Store,
+  Truck,
+  Users,
 };
 
-const tabHref: Record<Tab, string> = {
-  overview: "/admin",
-  store: "/admin/store",
-  products: "/admin/products",
-  categories: "/admin/categories",
-  orders: "/admin/orders",
-  coupons: "/admin/coupons",
-  reviews: "/admin/reviews",
-  questions: "/admin/questions",
-  reports: "/admin/reports",
-  payments: "/admin/payments",
-  shipping: "/admin/shipping",
-  marketing: "/admin/marketing",
-  newsletter: "/admin/newsletter",
-  inventory: "/admin/inventory",
-  branches: "/admin/branches",
-  staff: "/admin/staff",
-  audit: "/admin/audit",
-};
+function MenuIcon({ item, className }: { item: Tab; className?: string }) {
+  const menuItem = menuItems.find((menuEntry) => menuEntry.key === item);
+  const Icon = menuItem ? iconMap[menuItem.icon] : Gauge;
 
-const tabIcons: Record<Tab, ReactNode> = {
-  overview: <Gauge className="size-4" />,
-  store: <Store className="size-4" />,
-  products: <Package className="size-4" />,
-  categories: <FolderTree className="size-4" />,
-  orders: <ShoppingBag className="size-4" />,
-  coupons: <Percent className="size-4" />,
-  reviews: <MessageSquare className="size-4" />,
-  questions: <MessageSquare className="size-4" />,
-  reports: <ChartNoAxesCombined className="size-4" />,
-  payments: <CreditCard className="size-4" />,
-  shipping: <Truck className="size-4" />,
-  marketing: <Megaphone className="size-4" />,
-  newsletter: <Mail className="size-4" />,
-  inventory: <Layers3 className="size-4" />,
-  branches: <Building2 className="size-4" />,
-  staff: <Users className="size-4" />,
-  audit: <ScrollText className="size-4" />,
-};
-
-const tabDescriptions: Record<Tab, string> = {
-  overview: "Performance, sales, and daily store health.",
-  store: "Tenant settings, plan, domain, contact, and theme.",
-  products: "Catalog management with images, stock, and pricing.",
-  categories: "Category structure and storefront browsing.",
-  orders: "Fulfillment, statuses, and customer order activity.",
-  coupons: "Discount campaigns for mid and pro stores.",
-  reviews: "Approve, reject, and moderate customer product reviews.",
-  questions: "Answer product questions before showing them publicly.",
-  reports: "Sales, profit, and best-selling product insights.",
-  payments: "COD, bank transfer, and payment status review.",
-  shipping: "Delivery methods and customer checkout fees.",
-  marketing: "Storefront banners, hero content, and promotional notices.",
-  newsletter: "Newsletter subscribers and subscription health.",
-  inventory: "Low-stock monitoring and inventory movement logs.",
-  branches: "Multi-branch configuration for pro stores.",
-  staff: "Admin, manager, and staff user access.",
-  audit: "Admin activity and platform change history.",
-};
+  return <Icon className={className} />;
+}
 
 type ProductDraft = {
   id?: number;
@@ -333,6 +288,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const revenue = data.salesReport?.total_revenue || data.orders.reduce((sum, order) => sum + order.total, 0);
   const pendingOrders = data.orders.filter((order) => order.status === "pending").length;
@@ -375,18 +331,18 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
 
   return (
     <main className="min-h-screen bg-[#f6f6f3] text-black">
-      <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
+      <div className={cn("grid min-h-screen transition-[grid-template-columns] duration-300 ease-out", sidebarCollapsed ? "lg:grid-cols-[88px_1fr]" : "lg:grid-cols-[280px_1fr]")}>
         <aside className="hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
-          <div className="border-b border-neutral-100 px-6 py-5">
-            <Link href="/admin" className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-2xl bg-black text-white">
+          <div className={cn("border-b border-neutral-100 py-5 transition-all duration-300", sidebarCollapsed ? "px-4" : "px-6")}>
+            <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
+              <Link href="/admin" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-black text-white">
                 <ShoppingBag className="size-5" />
-              </span>
-              <span>
+              </Link>
+              <Link href="/admin" className={cn("min-w-0 overflow-hidden transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-44 opacity-100")}>
                 <span className="block text-sm font-black uppercase tracking-wide">ECOMMERCE</span>
                 <span className="text-xs text-neutral-500">Commerce control panel</span>
-              </span>
-            </Link>
+              </Link>
+            </div>
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
             {tabs.map((item) => (
@@ -394,17 +350,28 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
                 key={item}
                 href={tabHref[item]}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-neutral-600 hover:bg-neutral-100 hover:text-black",
+                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
+                  sidebarCollapsed && "justify-center px-0",
                   tab === item && "bg-black text-white hover:bg-black hover:text-white",
                 )}
+                title={sidebarCollapsed ? tabLabels[item] : undefined}
               >
-                {tabIcons[item]}
-                {tabLabels[item]}
+                <MenuIcon item={item} className="size-4 shrink-0" />
+                <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-40 opacity-100")}>{tabLabels[item]}</span>
               </Link>
             ))}
           </nav>
           <div className="border-t border-neutral-100 p-4">
-            <div className="rounded-[24px] bg-[#d8dfcc] p-4">
+            <button
+              type="button"
+              className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-neutral-200 text-xs font-bold uppercase transition hover:border-black"
+              onClick={() => setSidebarCollapsed((value) => !value)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+              <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-24 opacity-100")}>Collapse</span>
+            </button>
+            <div className={cn("overflow-hidden rounded-[24px] bg-[#d8dfcc] transition-all duration-300", sidebarCollapsed ? "max-h-0 p-0 opacity-0" : "max-h-40 p-4 opacity-100")}>
               <p className="text-xs font-bold uppercase text-black/60">Active workspace</p>
               <p className="mt-2 text-lg font-black">{data.store?.name || "Platform Admin"}</p>
               <p className="mt-1 text-xs text-black/60">Plan-based ecommerce backend</p>
@@ -448,7 +415,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
             <nav className="hide-scrollbar flex gap-2 overflow-x-auto border-t border-neutral-100 px-4 py-2 lg:hidden">
               {tabs.map((item) => (
                 <Link key={item} href={tabHref[item]} className={cn("flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold uppercase", tab === item ? "bg-black text-white" : "bg-neutral-100 text-neutral-600")}>
-                  {tabIcons[item]}
+                  <MenuIcon item={item} className="size-4" />
                   {tabLabels[item]}
                 </Link>
               ))}

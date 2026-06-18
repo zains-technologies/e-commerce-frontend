@@ -57,6 +57,8 @@ export interface InventoryLog {
   id: number;
   product_id: number;
   product_variant_id?: number | null;
+  product?: { id: number; name: string; sku?: string | null } | null;
+  variant?: { id: number; attribute_name: string; attribute_value: string; sku?: string | null } | null;
   order_id?: number | null;
   type: string;
   quantity_change: number;

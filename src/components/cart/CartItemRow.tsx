@@ -15,6 +15,10 @@ export function CartItemRow({
   onRemove: () => void;
   disabled?: boolean;
 }) {
+  const variantLabel = item.variant
+    ? [item.variant.options?.size, item.variant.options?.color].filter(Boolean).join(" / ") || item.variant.attribute_value
+    : item.product.sku;
+
   return (
     <div className="flex gap-4 border-b border-neutral-100 py-4">
       <img src={getPrimaryImage(item.product.images)} alt={item.product.name} className="size-24 rounded-[20px] object-cover" />
@@ -23,7 +27,7 @@ export function CartItemRow({
           <div>
             <h3 className="font-bold">{item.product.name}</h3>
             <p className="text-xs text-neutral-500">
-              {item.variant ? `${item.variant.attribute_name}: ${item.variant.attribute_value}` : item.product.sku}
+              {variantLabel}
             </p>
           </div>
           <p className="font-bold">{formatCurrency(item.line_total)}</p>
@@ -38,4 +42,3 @@ export function CartItemRow({
     </div>
   );
 }
-

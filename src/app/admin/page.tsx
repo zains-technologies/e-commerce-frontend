@@ -274,7 +274,8 @@ const staffPermissionOptions = ["products.view", "products.update", "orders.view
 const pageSizeOptions = [12, 24, 48].map((size) => ({ label: String(size), value: String(size) }));
 const bannerPositionOptions = ["home_hero", "promo", "notice", "category", "product"].map((value) => ({ label: titleCase(value), value }));
 const subscriberStatusOptions = ["subscribed", "unsubscribed", "bounced"].map((value) => ({ label: titleCase(value), value }));
-const sizeVariantOptions = ["", "XS", "S", "M", "L", "XL", "XXL", "One size"].map((value) => ({ label: value || "Choose size", value }));
+const variantSizeValues = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "One size"];
+const sizeVariantOptions = ["", ...variantSizeValues].map((value) => ({ label: value || "Choose size", value }));
 
 export default function AdminPage() {
   return <AdminShell initialTab="overview" />;
@@ -980,7 +981,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
           value={draft.specifications_text}
           onChange={(e) => setDraft({ ...draft, specifications_text: e.target.value })}
         />
-        <VariantBuilder colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
+        <VariantBuilder basePrice={Number(draft.price || 0)} colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
           </div>
           <div className="rounded-[28px] border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-bold uppercase text-neutral-500">Product images</p>
@@ -1085,7 +1086,10 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
         product.category?.name || "-",
         product.brand?.name || "-",
         formatCurrency(product.price),
-        <span key="stock" className={product.low_stock || product.stock_quantity <= 10 ? "font-bold text-red-600" : ""}>{product.stock_quantity}</span>,
+        <span key="stock" className={product.low_stock || product.stock_quantity <= 10 ? "font-bold text-red-600" : ""}>
+          {product.stock_quantity}
+          {product.variants?.length ? <small className="block text-neutral-500">{product.variants.length} variants</small> : null}
+        </span>,
         <StatusBadge key="status" status={product.status || "active"} />,
         <DateCell key="date" value={product.created_at} />,
         <ActionButtons key="actions" busy={busy} onEdit={() => edit(product)} onDelete={() => run(() => adminService.deleteProduct(product.id), "Product deleted.")} />,
@@ -1178,15 +1182,23 @@ function ColorMultiSelect({
 }
 
 function VariantBuilder({
+  basePrice,
   colors,
   rows,
   onChange,
 }: {
+  basePrice: number;
   colors: ProductColor[];
   rows: ProductVariantDraft[];
   onChange: (rows: ProductVariantDraft[]) => void;
 }) {
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedColorIds, setSelectedColorIds] = useState<string[]>([]);
+  const [defaultStock, setDefaultStock] = useState("0");
+  const [defaultPriceAdjustment, setDefaultPriceAdjustment] = useState("0");
   const colorOptions = [{ label: "Choose color", value: "" }, ...colors.map((color) => ({ label: color.name, value: String(color.id) }))];
+  const selectedColors = selectedColorIds.length ? selectedColorIds : colors.length ? colors.map((color) => String(color.id)) : [""];
+  const totalStock = rows.reduce((sum, row) => sum + Number(row.stock_quantity || 0), 0);
 
   function updateRow(id: string, patch: Partial<ProductVariantDraft>) {
     onChange(rows.map((row) => row.id === id ? { ...row, ...patch } : row));
@@ -1196,19 +1208,90 @@ function VariantBuilder({
     onChange([...rows, emptyVariantDraft()]);
   }
 
+  function toggleSize(size: string) {
+    setSelectedSizes((current) => current.includes(size) ? current.filter((item) => item !== size) : [...current, size]);
+  }
+
+  function toggleColor(colorId: string) {
+    setSelectedColorIds((current) => current.includes(colorId) ? current.filter((item) => item !== colorId) : [...current, colorId]);
+  }
+
+  function generateRows() {
+    const sizes = selectedSizes.length ? selectedSizes : [""];
+    const generated = sizes.flatMap((size) => selectedColors.map((color_id) => ({
+      ...emptyVariantDraft(),
+      size,
+      color_id,
+      price_adjustment: defaultPriceAdjustment || "0",
+      stock_quantity: defaultStock || "0",
+    })));
+    const existingKeys = new Set(rows.map((row) => `${row.size}|${row.color_id}`));
+    const nextRows = generated.filter((row) => !existingKeys.has(`${row.size}|${row.color_id}`));
+    onChange([...rows, ...nextRows]);
+  }
+
   return (
     <div className="rounded-[24px] border border-neutral-200 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase text-neutral-500">Variant combinations</p>
+        <div>
+          <p className="text-xs font-bold uppercase text-neutral-500">Variant combinations</p>
+          <p className="mt-1 text-xs text-neutral-500">{rows.length} variants · {totalStock} total units</p>
+        </div>
         <Button type="button" variant="outline" className="h-9 px-4" onClick={addRow}>Add variant</Button>
+      </div>
+      <div className="mb-4 grid gap-3 rounded-[20px] bg-neutral-50 p-3">
+        <div>
+          <p className="mb-2 text-[11px] font-bold uppercase text-neutral-500">Sizes</p>
+          <div className="flex flex-wrap gap-2">
+            {variantSizeValues.map((size) => (
+              <button
+                key={size}
+                type="button"
+                className={cn("h-9 rounded-full border px-3 text-xs font-bold uppercase transition", selectedSizes.includes(size) ? "border-black bg-black text-white" : "border-neutral-200 bg-white hover:border-black")}
+                onClick={() => toggleSize(size)}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+        {colors.length ? (
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase text-neutral-500">Colors</p>
+            <div className="flex flex-wrap gap-2">
+              {colors.map((color) => {
+                const colorId = String(color.id);
+                return (
+                  <button
+                    key={color.id}
+                    type="button"
+                    className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold uppercase transition", selectedColorIds.includes(colorId) ? "border-black bg-black text-white" : "border-neutral-200 bg-white hover:border-black")}
+                    onClick={() => toggleColor(colorId)}
+                  >
+                    <span className="size-4 rounded-full border border-neutral-300" style={{ backgroundColor: color.hex_code }} />
+                    {color.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <Input placeholder="Default stock" type="number" value={defaultStock} onChange={(event) => setDefaultStock(event.target.value)} />
+          <Input placeholder="+ price per variant" type="number" value={defaultPriceAdjustment} onChange={(event) => setDefaultPriceAdjustment(event.target.value)} />
+          <Button type="button" className="h-11 px-5" onClick={generateRows}>Generate variants</Button>
+        </div>
       </div>
       <div className="grid gap-3">
         {rows.map((row) => (
-          <div key={row.id} className="grid gap-2 rounded-[18px] bg-neutral-50 p-3 md:grid-cols-[1fr_1fr_1fr_.8fr_.8fr_auto]">
+          <div key={row.id} className="grid gap-2 rounded-[18px] bg-white p-3 ring-1 ring-neutral-100 md:grid-cols-[1fr_1fr_1fr_.8fr_.8fr_auto]">
             <Dropdown size="sm" value={row.size} options={sizeVariantOptions} onChange={(size) => updateRow(row.id, { size })} />
             <Dropdown size="sm" value={row.color_id} options={colorOptions} onChange={(color_id) => updateRow(row.id, { color_id })} />
             <Input placeholder="Variant SKU" value={row.sku} onChange={(event) => updateRow(row.id, { sku: event.target.value })} />
-            <Input placeholder="+ price" type="number" value={row.price_adjustment} onChange={(event) => updateRow(row.id, { price_adjustment: event.target.value })} />
+            <div>
+              <Input placeholder="+ price" type="number" value={row.price_adjustment} onChange={(event) => updateRow(row.id, { price_adjustment: event.target.value })} />
+              <p className="mt-1 px-2 text-[11px] font-bold uppercase text-neutral-400">{formatCurrency(basePrice + Number(row.price_adjustment || 0))}</p>
+            </div>
             <Input placeholder="Stock" type="number" value={row.stock_quantity} onChange={(event) => updateRow(row.id, { stock_quantity: event.target.value })} />
             <Button type="button" variant="outline" className="h-11 px-4" onClick={() => onChange(rows.filter((item) => item.id !== row.id))}>Remove</Button>
           </div>
@@ -1854,13 +1937,18 @@ function PaymentsPanel({ payments, busy, run }: { payments: Payment[]; busy: boo
 }
 
 function InventoryPanel({ products, logs, busy, run }: { products: Product[]; logs: ReturnType<typeof useAdmin>["data"]["inventoryLogs"]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
-  const lowStock = products.filter((product) => product.low_stock || product.stock_quantity <= 10);
+  const inventoryRows = products.flatMap((product) => product.variants?.length
+    ? product.variants.map((variant) => ({ product, variant, stock: variant.stock_quantity, sku: variant.sku || product.sku || "-", label: variant.attribute_value }))
+    : [{ product, variant: null as ProductVariant | null, stock: product.stock_quantity, sku: product.sku || "-", label: "Whole product" }]);
+  const lowStock = inventoryRows.filter((row) => row.stock <= 10);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draft, setDraft] = useState<RestockDraft>(emptyRestock);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const selectedVariant = draft.product?.variants?.find((variant) => String(variant.id) === draft.variant_id) || null;
+  const currentStock = selectedVariant ? selectedVariant.stock_quantity : draft.product?.stock_quantity;
 
-  function openRestock(product: Product) {
-    setDraft({ product, variant_id: "", quantity: "10", type: "restock", note: `Restock ${product.name}` });
+  function openRestock(product: Product, variant?: ProductVariant | null) {
+    setDraft({ product, variant_id: variant ? String(variant.id) : "", quantity: "10", type: "restock", note: `Restock ${variant ? `${product.name} - ${variant.attribute_value}` : product.name}` });
     setErrors({});
     setDrawerOpen(true);
   }
@@ -1887,19 +1975,28 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
   return (
     <div className="grid gap-4">
       <AdminCard>
-        <PanelTitle title="Low stock flags" subtitle="Products at or below the low-stock threshold." />
-        <AdminTable columns={["Image", "Product", "SKU", "Stock", "Date", "Action"]} rows={lowStock.map((product) => [
-          <img key="img" src={getPrimaryImage(product.images)} alt={product.name} className="size-14 rounded-2xl object-cover" />,
-          product.name,
-          product.sku || "-",
-          <span key="stock" className="font-bold text-red-600">{product.stock_quantity}</span>,
-          <DateCell key="date" value={product.updated_at || product.created_at} />,
-          <Button key="restock" type="button" className="h-8 px-3" onClick={() => openRestock(product)}>Adjust</Button>,
+        <PanelTitle title="Low stock flags" subtitle="Variant and product stock at or below the low-stock threshold." />
+        <AdminTable columns={["Image", "Product", "Variant", "SKU", "Stock", "Date", "Action"]} rows={lowStock.map((row) => [
+          <img key="img" src={getPrimaryImage(row.product.images)} alt={row.product.name} className="size-14 rounded-2xl object-cover" />,
+          row.product.name,
+          row.label,
+          row.sku,
+          <span key="stock" className="font-bold text-red-600">{row.stock}</span>,
+          <DateCell key="date" value={row.product.updated_at || row.product.created_at} />,
+          <Button key="restock" type="button" className="h-8 px-3" onClick={() => openRestock(row.product, row.variant)}>Adjust</Button>,
         ])} />
       </AdminCard>
       <AdminCard>
         <PanelTitle title="Inventory logs" subtitle="Stock changes generated by orders and adjustments." />
-        <AdminTable columns={["Type", "Product", "Change", "Stock After", "Note", "Date"]} rows={logs.map((log) => [<StatusBadge key="type" status={log.type} />, log.product_id, log.quantity_change, log.stock_after, log.note || "-", <DateCell key="date" value={log.created_at} />])} />
+        <AdminTable columns={["Type", "Product", "Variant", "Change", "Stock After", "Note", "Date"]} rows={logs.map((log) => [
+          <StatusBadge key="type" status={log.type} />,
+          log.product?.name || log.product_id,
+          log.variant?.attribute_value || "-",
+          log.quantity_change,
+          log.stock_after,
+          log.note || "-",
+          <DateCell key="date" value={log.created_at} />,
+        ])} />
       </AdminCard>
       <Drawer open={drawerOpen} title="Inventory adjustment" subtitle="Restock, correct counts, or log damaged/returned stock with a reason." onClose={() => setDrawerOpen(false)}>
         <form onSubmit={submit} className="grid gap-3">
@@ -1907,14 +2004,14 @@ function InventoryPanel({ products, logs, busy, run }: { products: Product[]; lo
             <div className="rounded-[24px] bg-neutral-50 p-4">
               <p className="text-[11px] font-bold uppercase text-neutral-500">Product</p>
               <p className="mt-2 font-black">{draft.product.name}</p>
-              <p className="text-sm text-neutral-500">Current stock: {draft.product.stock_quantity}</p>
+              <p className="text-sm text-neutral-500">{selectedVariant ? selectedVariant.attribute_value : "Whole product"} stock: {currentStock}</p>
             </div>
           )}
           {draft.product?.variants?.length ? (
             <Dropdown
               value={draft.variant_id}
-              placeholder="Whole product stock"
-              options={[{ label: "Whole product stock", value: "" }, ...draft.product.variants.map((variant) => ({ label: `${variant.attribute_name}: ${variant.attribute_value} (${variant.stock_quantity})`, value: String(variant.id) }))]}
+              placeholder="Select variant stock"
+              options={draft.product.variants.map((variant) => ({ label: `${variant.attribute_value} (${variant.stock_quantity})`, value: String(variant.id) }))}
               onChange={(value) => setDraft({ ...draft, variant_id: value })}
             />
           ) : null}
@@ -2297,6 +2394,9 @@ function BestSellerChart({ rows }: { rows: Array<{ label: string; quantity: numb
 }
 
 function productPayload(draft: ProductDraft, colors: ProductColor[] = []) {
+  const variants = variantRowsPayload(draft.variant_rows, colors);
+  const variantStockTotal = variants.reduce((sum, variant) => sum + Number(variant.stock_quantity || 0), 0);
+
   return {
     category_id: Number(draft.category_id),
     brand_id: draft.brand_id ? Number(draft.brand_id) : null,
@@ -2310,7 +2410,7 @@ function productPayload(draft: ProductDraft, colors: ProductColor[] = []) {
     price: Number(draft.price),
     cost_price: Number(draft.cost_price || 0),
     sku: draft.sku,
-    stock_quantity: Number(draft.stock_quantity),
+    stock_quantity: variants.length ? variantStockTotal : Number(draft.stock_quantity),
     status: draft.status,
     is_featured: draft.is_featured,
     tag_ids: draft.tag_ids,
@@ -2318,7 +2418,7 @@ function productPayload(draft: ProductDraft, colors: ProductColor[] = []) {
     color_ids: draft.color_ids,
     related_product_ids: draft.related_product_ids,
     specifications: parseSpecifications(draft.specifications_text),
-    variants: variantRowsPayload(draft.variant_rows, colors),
+    variants,
   };
 }
 

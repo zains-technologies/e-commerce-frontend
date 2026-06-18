@@ -37,15 +37,46 @@ export default function ProductDetailPage() {
       .then((data) => {
         setProduct(data);
         setActiveImage(getPrimaryImage(data.images));
-        setVariant(data.variants?.[0] || null);
+        setVariant(data.variants?.find((item) => item.stock_quantity > 0) || data.variants?.[0] || null);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [slug]);
 
+  const variants = useMemo(() => product?.variants || [], [product]);
+  const hasStructuredVariants = useMemo(() => variants.some((item) => item.options?.size || item.options?.color_id), [variants]);
   const price = useMemo(() => (product ? product.price + (variant?.price_adjustment || 0) : 0), [product, variant]);
   const selectedColorId = variant?.options?.color_id ? Number(variant.options.color_id) : null;
-  const variantOptions = useMemo(() => (product?.variants || []).map((item) => ({ label: item.attribute_value, value: String(item.id) })), [product]);
+  const selectedSize = variant?.options?.size || "";
+  const activeStock = variant ? variant.stock_quantity : product?.stock_quantity || 0;
+  const variantOptions = useMemo(() => variants.map((item) => ({ label: `${item.attribute_value} · ${item.stock_quantity} in stock`, value: String(item.id) })), [variants]);
+  const sizeOptions = useMemo(() => {
+    const sizeSet = new Set<string>();
+    variants
+      .filter((item) => !selectedColorId || Number(item.options?.color_id) === selectedColorId)
+      .forEach((item) => {
+        if (item.options?.size) sizeSet.add(item.options.size);
+      });
+    return Array.from(sizeSet);
+  }, [selectedColorId, variants]);
+  const visibleColors = useMemo(() => (product?.colors || []).filter((color) => variants.some((item) => Number(item.options?.color_id) === color.id)), [product, variants]);
+
+  function chooseColor(colorId: number) {
+    const nextVariant = variants.find((item) => Number(item.options?.color_id) === colorId && item.options?.size === selectedSize)
+      || variants.find((item) => Number(item.options?.color_id) === colorId && item.stock_quantity > 0)
+      || variants.find((item) => Number(item.options?.color_id) === colorId)
+      || null;
+    setVariant(nextVariant);
+    if (nextVariant?.stock_quantity) setQuantity((value) => Math.min(value, nextVariant.stock_quantity));
+  }
+
+  function chooseSize(size: string) {
+    const nextVariant = variants.find((item) => item.options?.size === size && (!selectedColorId || Number(item.options?.color_id) === selectedColorId))
+      || variants.find((item) => item.options?.size === size)
+      || null;
+    setVariant(nextVariant);
+    if (nextVariant?.stock_quantity) setQuantity((value) => Math.min(value, nextVariant.stock_quantity));
+  }
 
   async function submitReview(event: FormEvent) {
     event.preventDefault();
@@ -94,20 +125,21 @@ export default function ProductDetailPage() {
                 ) : null}
                 <p className="mt-5 text-2xl font-bold">{formatCurrency(price)}</p>
                 <p className="mt-5 max-w-xl text-sm leading-6 text-neutral-600">{product.description}</p>
-                {product.colors?.length ? (
+                {visibleColors.length ? (
                   <div className="mt-8 space-y-4">
                     <p className="text-xs font-bold uppercase text-neutral-500">Color</p>
                     <div className="flex flex-wrap gap-3">
-                      {product.colors.map((color) => {
-                        const colorVariant = (product.variants || []).find((item) => Number(item.options?.color_id) === color.id);
-                        const selected = selectedColorId === color.id || (!selectedColorId && !variant && product.colors?.[0]?.id === color.id);
+                      {visibleColors.map((color) => {
+                        const colorStock = variants.filter((item) => Number(item.options?.color_id) === color.id).reduce((sum, item) => sum + item.stock_quantity, 0);
+                        const selected = selectedColorId === color.id;
 
                         return (
                           <button
                             key={color.id}
                             type="button"
-                            onClick={() => colorVariant && setVariant(colorVariant)}
-                            className={`inline-flex h-14 items-center gap-4 rounded-full border px-5 text-sm font-black uppercase tracking-wide transition ${selected ? "border-black" : "border-neutral-200 hover:border-black"}`}
+                            disabled={colorStock <= 0}
+                            onClick={() => chooseColor(color.id)}
+                            className={`inline-flex h-14 items-center gap-4 rounded-full border px-5 text-sm font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-40 ${selected ? "border-black" : "border-neutral-200 hover:border-black"}`}
                           >
                             <span className="size-9 rounded-full border border-neutral-300" style={{ backgroundColor: color.hex_code }} />
                             {color.name}
@@ -117,7 +149,30 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                 ) : null}
-                {variantOptions.length ? (
+                {hasStructuredVariants && sizeOptions.length ? (
+                  <div className="mt-8 space-y-4">
+                    <p className="text-xs font-bold uppercase text-neutral-500">Size</p>
+                    <div className="flex flex-wrap gap-2">
+                      {sizeOptions.map((size) => {
+                        const sizeVariant = variants.find((item) => item.options?.size === size && (!selectedColorId || Number(item.options?.color_id) === selectedColorId));
+                        const disabled = !sizeVariant || sizeVariant.stock_quantity <= 0;
+
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => chooseSize(size)}
+                            className={`grid h-12 min-w-12 place-items-center rounded-full border px-3 text-sm font-black uppercase transition disabled:cursor-not-allowed disabled:opacity-40 ${selectedSize === size ? "border-black bg-black text-white" : "border-neutral-200 hover:border-black"}`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {!hasStructuredVariants && variantOptions.length ? (
                   <div className="mt-8 max-w-sm space-y-3">
                     <p className="text-xs font-bold uppercase text-neutral-500">Variant</p>
                     <Dropdown
@@ -128,6 +183,9 @@ export default function ProductDetailPage() {
                     />
                   </div>
                 ) : null}
+                <p className={`mt-5 text-sm font-bold ${activeStock <= 0 ? "text-red-600" : "text-neutral-500"}`}>
+                  {activeStock > 0 ? `${activeStock} in stock${variant ? ` · ${variant.sku || variant.attribute_value}` : ""}` : "Out of stock"}
+                </p>
                 {product.size_guide && (
                   <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
                     <p className="text-xs font-bold uppercase text-neutral-500">{product.size_guide.name}</p>
@@ -151,10 +209,10 @@ export default function ProductDetailPage() {
                   <div className="inline-flex h-12 items-center rounded-full border border-neutral-200">
                     <button className="size-12" onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
                     <span className="w-10 text-center font-bold">{quantity}</span>
-                    <button className="size-12" onClick={() => setQuantity(quantity + 1)}>+</button>
+                    <button className="size-12" onClick={() => setQuantity(activeStock > 0 ? Math.min(activeStock, quantity + 1) : quantity)}>+</button>
                   </div>
-                  <Button disabled={busy} onClick={() => addItem({ product_id: product.id, product_variant_id: variant?.id, quantity })}>
-                    Add to cart
+                  <Button disabled={busy || activeStock <= 0 || quantity > activeStock || (variants.length > 0 && !variant)} onClick={() => addItem({ product_id: product.id, product_variant_id: variant?.id, quantity })}>
+                    {activeStock <= 0 ? "Out of stock" : "Add to cart"}
                   </Button>
                 </div>
               </div>

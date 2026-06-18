@@ -1250,11 +1250,15 @@ function CatalogSetupPanel({
 
   return (
     <div className="mb-5 grid gap-3 rounded-[28px] border border-neutral-200 bg-neutral-50 p-4 lg:grid-cols-5">
-      {groups.map((group) => (
+      {groups.map((group) => {
+        const isColorGroup = group.key === "color";
+
+        return (
         <div key={group.key} className="rounded-[22px] bg-white p-4">
           <p className="text-xs font-bold uppercase text-neutral-500">{group.title}</p>
           <div className="mt-3 flex gap-2">
             <Input
+              className={isColorGroup ? "min-w-0 flex-1" : undefined}
               placeholder={`Add ${group.title.toLowerCase()}`}
               value={group.value}
               onChange={(event) => setDraft({ ...draft, [group.key]: event.target.value })}
@@ -1265,21 +1269,24 @@ function CatalogSetupPanel({
                 }
               }}
             />
-            {group.key === "color" && (
-              <input
-                type="color"
-                aria-label="Color value"
-                className="h-11 w-12 shrink-0 cursor-pointer rounded-full border border-neutral-200 bg-white p-1"
-                value={draft.colorHex}
-                onChange={(event) => setDraft({ ...draft, colorHex: event.target.value })}
-              />
+            {isColorGroup && (
+              <label className="relative grid size-11 shrink-0 cursor-pointer place-items-center rounded-full border border-neutral-200 bg-white transition hover:border-black" title="Choose color">
+                <input
+                  type="color"
+                  aria-label="Color value"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  value={draft.colorHex}
+                  onChange={(event) => setDraft({ ...draft, colorHex: event.target.value })}
+                />
+                <span className="size-6 rounded-full border border-neutral-300 shadow-inner" style={{ backgroundColor: draft.colorHex }} />
+              </label>
             )}
             <Button type="button" className="h-11 px-4" onClick={() => createItem(group.key)}>Add</Button>
           </div>
           <div className="mt-3 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
             {group.items.map((item) => (
-              <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1 text-xs font-bold">
-                {"hex_code" in item && <span className="size-3 rounded-full border border-neutral-300" style={{ backgroundColor: item.hex_code }} />}
+              <span key={item.id} className={cn("inline-flex items-center gap-2 rounded-full border border-neutral-200 text-xs font-bold", "hex_code" in item ? "px-2.5 py-1" : "px-3 py-1")}>
+                {"hex_code" in item && <span className="size-4 rounded-full border border-neutral-300 shadow-inner" style={{ backgroundColor: item.hex_code }} />}
                 {item.name}
                 <button
                   type="button"
@@ -1294,7 +1301,8 @@ function CatalogSetupPanel({
             {!group.items.length && <span className="text-xs text-neutral-400">No records yet</span>}
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 }

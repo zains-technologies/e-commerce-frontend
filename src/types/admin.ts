@@ -1,5 +1,5 @@
 import type { Product } from "./product";
-import type { CatalogBrand, CatalogTag, ProductCollection, SizeGuide } from "./product";
+import type { CatalogBrand, CatalogTag, ProductCollection, ProductColor, SizeGuide } from "./product";
 import type { ProductQuestion } from "./product";
 import type { Category } from "./category";
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "./marketing";
@@ -151,6 +151,7 @@ export interface AdminDashboardData {
   brands?: CatalogBrand[];
   tags?: CatalogTag[];
   collections?: ProductCollection[];
+  colors?: ProductColor[];
   sizeGuides?: SizeGuide[];
   reviews?: import("./product").ProductReview[];
   notifications?: Array<{ type: string; title: string; message: string; target: string }>;

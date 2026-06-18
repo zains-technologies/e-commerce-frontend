@@ -46,7 +46,7 @@ import { adminService } from "@/services/adminService";
 import { authService } from "@/services/authService";
 import type { Branch, Coupon, Order, Payment, StaffUser, StoreSettings } from "@/types/admin";
 import type { Category } from "@/types/category";
-import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductQuestion, ProductVariant, SizeGuide } from "@/types/product";
+import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductColor, ProductQuestion, ProductVariant, SizeGuide } from "@/types/product";
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
 
 const tabs = ["overview", "store", "products", "categories", "orders", "coupons", "reviews", "questions", "reports", "payments", "shipping", "marketing", "newsletter", "inventory", "branches", "staff", "audit"] as const;
@@ -151,9 +151,19 @@ type ProductDraft = {
   is_featured: boolean;
   tag_ids: number[];
   collection_ids: number[];
+  color_ids: number[];
   related_product_ids: number[];
   specifications_text: string;
-  variants_text: string;
+  variant_rows: ProductVariantDraft[];
+};
+
+type ProductVariantDraft = {
+  id: string;
+  size: string;
+  color_id: string;
+  sku: string;
+  price_adjustment: string;
+  stock_quantity: string;
 };
 
 type CategoryDraft = {
@@ -237,6 +247,8 @@ type CatalogQuickDraft = {
   brand: string;
   tag: string;
   collection: string;
+  color: string;
+  colorHex: string;
   sizeGuide: string;
 };
 
@@ -282,9 +294,10 @@ const emptyProduct: ProductDraft = {
   is_featured: false,
   tag_ids: [],
   collection_ids: [],
+  color_ids: [],
   related_product_ids: [],
   specifications_text: "",
-  variants_text: "",
+  variant_rows: [],
 };
 const emptyCategory: CategoryDraft = { is_parent: true, parent_id: "", sort_order: "0", name: "", slug: "", description: "", image_path: "", banner_path: "", is_active: true };
 const emptyCoupon: CouponDraft = { code: "", type: "percentage", value: "10", starts_at: "", ends_at: "", usage_limit: "50", is_active: true };
@@ -292,7 +305,7 @@ const emptyBranch: BranchDraft = { name: "", phone: "", address: "", is_active: 
 const emptyStaff: StaffDraft = { name: "", email: "", phone: "", role: "staff", permissions: ["products.view", "orders.view"], password: "password" };
 const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", currency: "LKR", domain: "localhost", custom_domain: "", plan: "simple", primary: "#111111", secondary: "#d8dfcc", accent: "#ef4444", delivery_fee: "0", notice_enabled: false, notice_message: "", notice_coupon_code: "", notice_href: "/products" };
 const emptyRestock: RestockDraft = { variant_id: "", quantity: "10", type: "restock", note: "Manual restock from admin panel" };
-const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", sizeGuide: "" };
+const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", color: "", colorHex: "#111111", sizeGuide: "" };
 const emptyShipping: ShippingDraft = { name: "", code: "", description: "", fee: "0", min_order_total: "", sort_order: "0", is_active: true };
 const emptyBanner: BannerDraft = { title: "", subtitle: "", current_image_url: "", link_url: "/products", position: "home_hero", starts_at: "", ends_at: "", sort_order: "0", is_active: true };
 const planOptions = [{ label: "Simple", value: "simple" }, { label: "Mid", value: "mid" }, { label: "Pro", value: "pro" }];
@@ -306,6 +319,7 @@ const staffPermissionOptions = ["products.view", "products.update", "orders.view
 const pageSizeOptions = [12, 24, 48].map((size) => ({ label: String(size), value: String(size) }));
 const bannerPositionOptions = ["home_hero", "promo", "notice", "category", "product"].map((value) => ({ label: titleCase(value), value }));
 const subscriberStatusOptions = ["subscribed", "unsubscribed", "bounced"].map((value) => ({ label: titleCase(value), value }));
+const sizeVariantOptions = ["", "XS", "S", "M", "L", "XL", "XXL", "One size"].map((value) => ({ label: value || "Choose size", value }));
 
 export default function AdminPage() {
   return <AdminShell initialTab="overview" />;
@@ -480,6 +494,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
                   brands={data.brands || []}
                   tags={data.tags || []}
                   collections={data.collections || []}
+                  colors={data.colors || []}
                   sizeGuides={data.sizeGuides || []}
                   allProducts={data.products}
                   busy={busy}
@@ -779,12 +794,13 @@ function StorePanel({ store, busy, run }: { store?: StoreSettings; busy: boolean
   );
 }
 
-function ProductPanel({ products, categories, brands, tags, collections, sizeGuides, allProducts, busy, search, setSearch, run }: {
+function ProductPanel({ products, categories, brands, tags, collections, colors, sizeGuides, allProducts, busy, search, setSearch, run }: {
   products: Product[];
   categories: Category[];
   brands: CatalogBrand[];
   tags: CatalogTag[];
   collections: ProductCollection[];
+  colors: ProductColor[];
   sizeGuides: SizeGuide[];
   allProducts: Product[];
   busy: boolean;
@@ -800,7 +816,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
   const [viewer, setViewer] = useState<{ src: string; label: string } | null>(null);
   const [pendingImageDelete, setPendingImageDelete] = useState<{ id: number; label: string } | null>(null);
   const [catalogDraft, setCatalogDraft] = useState<CatalogQuickDraft>(emptyCatalogQuick);
-  const [pendingCatalogDelete, setPendingCatalogDelete] = useState<{ type: "brand" | "tag" | "collection" | "sizeGuide"; id: number; label: string } | null>(null);
+  const [pendingCatalogDelete, setPendingCatalogDelete] = useState<{ type: "brand" | "tag" | "collection" | "color" | "sizeGuide"; id: number; label: string } | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const editing = Boolean(draft.id);
@@ -837,9 +853,10 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
       is_featured: Boolean(product.is_featured),
       tag_ids: (product.tags || []).map((tag) => tag.id),
       collection_ids: (product.collections || []).map((collection) => collection.id),
+      color_ids: (product.colors || []).map((color) => color.id),
       related_product_ids: (product.related_products || []).map((related) => related.id),
       specifications_text: (product.specifications || []).map((specification) => `${specification.name}: ${specification.value || ""}`).join("\n"),
-      variants_text: (product.variants || []).map((item) => variantToLine(item)).join("\n"),
+      variant_rows: (product.variants || []).map((item) => variantToDraft(item, colors)),
     });
     setDrawerOpen(true);
   }
@@ -864,7 +881,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
 
     await run(
       async () => {
-        const payload = imageFiles.length ? productFormData(draft, imageFiles) : productPayload(draft);
+        const payload = imageFiles.length ? productFormData(draft, imageFiles, colors) : productPayload(draft, colors);
         if (editing && draft.id) {
           const oldImages = imageFiles.length ? editingProduct?.images || [] : [];
           const updatedProduct = await adminService.updateProduct(draft.id, payload);
@@ -900,7 +917,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
     });
   }
 
-  function createCatalogItem(type: keyof CatalogQuickDraft) {
+  function createCatalogItem(type: "brand" | "tag" | "collection" | "color" | "sizeGuide") {
     const value = catalogDraft[type].trim();
     if (!value) return;
     const payload = { name: value };
@@ -908,6 +925,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
       brand: () => adminService.createBrand(payload),
       tag: () => adminService.createTag(payload),
       collection: () => adminService.createCollection(payload),
+      color: () => adminService.createColor({ name: value, hex_code: normalizeHex(catalogDraft.colorHex) }),
       sizeGuide: () => adminService.createSizeGuide({ name: value, rows: [], is_active: true }),
     };
 
@@ -921,6 +939,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
       brand: () => adminService.deleteBrand(pendingCatalogDelete.id),
       tag: () => adminService.deleteTag(pendingCatalogDelete.id),
       collection: () => adminService.deleteCollection(pendingCatalogDelete.id),
+      color: () => adminService.deleteColor(pendingCatalogDelete.id),
       sizeGuide: () => adminService.deleteSizeGuide(pendingCatalogDelete.id),
     };
     const typeLabel = pendingCatalogDelete.type === "sizeGuide" ? "Size guide" : titleCase(pendingCatalogDelete.type);
@@ -952,6 +971,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
         brands={brands}
         tags={tags}
         collections={collections}
+        colors={colors}
         sizeGuides={sizeGuides}
         draft={catalogDraft}
         setDraft={setCatalogDraft}
@@ -985,6 +1005,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
         </label>
         <CatalogMultiSelect title="Tags" items={tags} selected={draft.tag_ids} onChange={(tag_ids) => setDraft({ ...draft, tag_ids })} />
         <CatalogMultiSelect title="Collections" items={collections} selected={draft.collection_ids} onChange={(collection_ids) => setDraft({ ...draft, collection_ids })} />
+        <ColorMultiSelect colors={colors} selected={draft.color_ids} onChange={(color_ids) => setDraft({ ...draft, color_ids })} />
         <CatalogMultiSelect title="Related products" items={allProducts.filter((item) => item.id !== draft.id)} selected={draft.related_product_ids} onChange={(related_product_ids) => setDraft({ ...draft, related_product_ids })} />
         <textarea
           className="min-h-28 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none"
@@ -992,12 +1013,7 @@ function ProductPanel({ products, categories, brands, tags, collections, sizeGui
           value={draft.specifications_text}
           onChange={(e) => setDraft({ ...draft, specifications_text: e.target.value })}
         />
-        <textarea
-          className="min-h-32 rounded-[24px] border border-neutral-200 p-4 text-sm outline-none"
-          placeholder={"Variant combinations, one per line\nsize=M,color=Black | M / Black | SKU-M-BLK | 0 | 10"}
-          value={draft.variants_text}
-          onChange={(e) => setDraft({ ...draft, variants_text: e.target.value })}
-        />
+        <VariantBuilder colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
           </div>
           <div className="rounded-[28px] border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-xs font-bold uppercase text-neutral-500">Product images</p>
@@ -1153,10 +1169,94 @@ function CatalogMultiSelect({
   );
 }
 
+function ColorMultiSelect({
+  colors,
+  selected,
+  onChange,
+}: {
+  colors: ProductColor[];
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  if (!colors.length) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-neutral-200 p-4 text-sm text-neutral-500">
+        Add colors above before assigning product colors.
+      </div>
+    );
+  }
+
+  function toggle(id: number) {
+    onChange(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]);
+  }
+
+  return (
+    <div className="rounded-[24px] border border-neutral-200 p-4">
+      <p className="mb-3 text-xs font-bold uppercase text-neutral-500">Product colors</p>
+      <div className="flex flex-wrap gap-2">
+        {colors.map((color) => (
+          <button
+            key={color.id}
+            type="button"
+            className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold uppercase transition", selected.includes(color.id) ? "border-black bg-black text-white" : "border-neutral-200 bg-white hover:border-black")}
+            onClick={() => toggle(color.id)}
+          >
+            <span className="size-4 rounded-full border border-neutral-300" style={{ backgroundColor: color.hex_code }} />
+            {color.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VariantBuilder({
+  colors,
+  rows,
+  onChange,
+}: {
+  colors: ProductColor[];
+  rows: ProductVariantDraft[];
+  onChange: (rows: ProductVariantDraft[]) => void;
+}) {
+  const colorOptions = [{ label: "Choose color", value: "" }, ...colors.map((color) => ({ label: color.name, value: String(color.id) }))];
+
+  function updateRow(id: string, patch: Partial<ProductVariantDraft>) {
+    onChange(rows.map((row) => row.id === id ? { ...row, ...patch } : row));
+  }
+
+  function addRow() {
+    onChange([...rows, emptyVariantDraft()]);
+  }
+
+  return (
+    <div className="rounded-[24px] border border-neutral-200 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase text-neutral-500">Variant combinations</p>
+        <Button type="button" variant="outline" className="h-9 px-4" onClick={addRow}>Add variant</Button>
+      </div>
+      <div className="grid gap-3">
+        {rows.map((row) => (
+          <div key={row.id} className="grid gap-2 rounded-[18px] bg-neutral-50 p-3 md:grid-cols-[1fr_1fr_1fr_.8fr_.8fr_auto]">
+            <Dropdown size="sm" value={row.size} options={sizeVariantOptions} onChange={(size) => updateRow(row.id, { size })} />
+            <Dropdown size="sm" value={row.color_id} options={colorOptions} onChange={(color_id) => updateRow(row.id, { color_id })} />
+            <Input placeholder="Variant SKU" value={row.sku} onChange={(event) => updateRow(row.id, { sku: event.target.value })} />
+            <Input placeholder="+ price" type="number" value={row.price_adjustment} onChange={(event) => updateRow(row.id, { price_adjustment: event.target.value })} />
+            <Input placeholder="Stock" type="number" value={row.stock_quantity} onChange={(event) => updateRow(row.id, { stock_quantity: event.target.value })} />
+            <Button type="button" variant="outline" className="h-11 px-4" onClick={() => onChange(rows.filter((item) => item.id !== row.id))}>Remove</Button>
+          </div>
+        ))}
+        {!rows.length && <p className="text-sm text-neutral-500">Add size/color variants when this product has multiple sellable combinations.</p>}
+      </div>
+    </div>
+  );
+}
+
 function CatalogSetupPanel({
   brands,
   tags,
   collections,
+  colors,
   sizeGuides,
   draft,
   setDraft,
@@ -1166,21 +1266,23 @@ function CatalogSetupPanel({
   brands: CatalogBrand[];
   tags: CatalogTag[];
   collections: ProductCollection[];
+  colors: ProductColor[];
   sizeGuides: SizeGuide[];
   draft: CatalogQuickDraft;
   setDraft: (draft: CatalogQuickDraft) => void;
-  createItem: (type: keyof CatalogQuickDraft) => void;
-  requestDelete: (item: { type: "brand" | "tag" | "collection" | "sizeGuide"; id: number; label: string }) => void;
+  createItem: (type: "brand" | "tag" | "collection" | "color" | "sizeGuide") => void;
+  requestDelete: (item: { type: "brand" | "tag" | "collection" | "color" | "sizeGuide"; id: number; label: string }) => void;
 }) {
   const groups = [
     { key: "brand" as const, title: "Brands", value: draft.brand, items: brands },
     { key: "tag" as const, title: "Tags", value: draft.tag, items: tags },
     { key: "collection" as const, title: "Collections", value: draft.collection, items: collections },
+    { key: "color" as const, title: "Colors", value: draft.color, items: colors },
     { key: "sizeGuide" as const, title: "Size guides", value: draft.sizeGuide, items: sizeGuides },
   ];
 
   return (
-    <div className="mb-5 grid gap-3 rounded-[28px] border border-neutral-200 bg-neutral-50 p-4 lg:grid-cols-4">
+    <div className="mb-5 grid gap-3 rounded-[28px] border border-neutral-200 bg-neutral-50 p-4 lg:grid-cols-5">
       {groups.map((group) => (
         <div key={group.key} className="rounded-[22px] bg-white p-4">
           <p className="text-xs font-bold uppercase text-neutral-500">{group.title}</p>
@@ -1196,11 +1298,21 @@ function CatalogSetupPanel({
                 }
               }}
             />
+            {group.key === "color" && (
+              <input
+                type="color"
+                aria-label="Color value"
+                className="h-11 w-12 shrink-0 cursor-pointer rounded-full border border-neutral-200 bg-white p-1"
+                value={draft.colorHex}
+                onChange={(event) => setDraft({ ...draft, colorHex: event.target.value })}
+              />
+            )}
             <Button type="button" className="h-11 px-4" onClick={() => createItem(group.key)}>Add</Button>
           </div>
           <div className="mt-3 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
             {group.items.map((item) => (
               <span key={item.id} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1 text-xs font-bold">
+                {"hex_code" in item && <span className="size-3 rounded-full border border-neutral-300" style={{ backgroundColor: item.hex_code }} />}
                 {item.name}
                 <button
                   type="button"
@@ -2209,7 +2321,7 @@ function BestSellerChart({ rows }: { rows: Array<{ label: string; quantity: numb
   );
 }
 
-function productPayload(draft: ProductDraft) {
+function productPayload(draft: ProductDraft, colors: ProductColor[] = []) {
   return {
     category_id: Number(draft.category_id),
     brand_id: draft.brand_id ? Number(draft.brand_id) : null,
@@ -2228,9 +2340,10 @@ function productPayload(draft: ProductDraft) {
     is_featured: draft.is_featured,
     tag_ids: draft.tag_ids,
     collection_ids: draft.collection_ids,
+    color_ids: draft.color_ids,
     related_product_ids: draft.related_product_ids,
     specifications: parseSpecifications(draft.specifications_text),
-    variants: parseVariantLines(draft.variants_text),
+    variants: variantRowsPayload(draft.variant_rows, colors),
   };
 }
 
@@ -2374,12 +2487,27 @@ function isSlug(value: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 }
 
-function productFormData(draft: ProductDraft, files: File[]) {
-  const payload = productPayload(draft);
+function productFormData(draft: ProductDraft, files: File[], colors: ProductColor[] = []) {
+  const payload = productPayload(draft, colors);
   const formData = new FormData();
   appendFormData(formData, payload);
   files.forEach((file) => formData.append("images[]", file));
   return formData;
+}
+
+function emptyVariantDraft(): ProductVariantDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    size: "",
+    color_id: "",
+    sku: "",
+    price_adjustment: "0",
+    stock_quantity: "0",
+  };
+}
+
+function normalizeHex(value: string) {
+  return /^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#111111";
 }
 
 function appendFormData(formData: FormData, payload: Record<string, unknown>, prefix?: string) {
@@ -2423,43 +2551,39 @@ function parseSpecifications(value: string) {
     .filter((item) => item.name);
 }
 
-function parseVariantLines(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [optionsText = "", label = "", sku = "", priceAdjustment = "0", stock = "0"] = line.split("|").map((part) => part.trim());
-      const options = Object.fromEntries(
-        optionsText
-          .split(",")
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .map((part) => {
-            const [key, ...rest] = part.split("=");
-            return [key.trim(), rest.join("=").trim()];
-          })
-          .filter(([key, optionValue]) => key && optionValue),
-      );
-      const attributeValue = label || Object.values(options).join(" / ") || optionsText;
+function variantRowsPayload(rows: ProductVariantDraft[], colors: ProductColor[]) {
+  return rows
+    .filter((row) => row.size || row.color_id || row.sku || Number(row.stock_quantity || 0) > 0)
+    .map((row) => {
+      const colorName = row.color_id ? colors.find((color) => color.id === Number(row.color_id))?.name || `Color ${row.color_id}` : "";
+      const label = [row.size, colorName].filter(Boolean).join(" / ") || row.sku || "Variant";
 
       return {
-        attribute_name: Object.keys(options).length > 1 ? "combination" : Object.keys(options)[0] || "option",
-        attribute_value: attributeValue,
-        options,
-        sku,
-        price_adjustment: Number(priceAdjustment || 0),
-        stock_quantity: Number(stock || 0),
+        attribute_name: row.size && row.color_id ? "combination" : row.size ? "size" : "color",
+        attribute_value: label,
+        options: {
+          ...(row.size ? { size: row.size } : {}),
+          ...(row.color_id ? { color_id: row.color_id, color: colorName } : {}),
+        },
+        sku: row.sku,
+        price_adjustment: Number(row.price_adjustment || 0),
+        stock_quantity: Number(row.stock_quantity || 0),
       };
     });
 }
 
-function variantToLine(variant: ProductVariant) {
-  const options = variant.options && Object.keys(variant.options).length
-    ? Object.entries(variant.options).map(([key, value]) => `${key}=${value}`).join(",")
-    : `${variant.attribute_name}=${variant.attribute_value}`;
+function variantToDraft(variant: ProductVariant, colors: ProductColor[]): ProductVariantDraft {
+  const options = variant.options || {};
+  const colorId = String(options.color_id || colors.find((color) => color.name.toLowerCase() === String(options.color || "").toLowerCase())?.id || "");
 
-  return `${options} | ${variant.attribute_value} | ${variant.sku || ""} | ${variant.price_adjustment || 0} | ${variant.stock_quantity || 0}`;
+  return {
+    id: String(variant.id),
+    size: String(options.size || ""),
+    color_id: colorId,
+    sku: variant.sku || "",
+    price_adjustment: String(variant.price_adjustment || 0),
+    stock_quantity: String(variant.stock_quantity || 0),
+  };
 }
 
 function storeDraftFromStore(store: StoreSettings): StoreDraft {

@@ -2,7 +2,7 @@ import { API_ROUTES } from "@/constants/apiRoutes";
 import { getToken } from "@/lib/utils";
 import { API_BASE_URL, apiRequest, type PaginatedResponse, type SingleResponse } from "./api";
 import type { Category } from "@/types/category";
-import type { CatalogBrand, CatalogTag, Product, ProductCollection, SizeGuide } from "@/types/product";
+import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductColor, SizeGuide } from "@/types/product";
 import type {
   Branch,
   Coupon,
@@ -47,6 +47,7 @@ export const adminService = {
   brands: () => listWithFallback<CatalogBrand>(API_ROUTES.BRANDS, API_ROUTES.ADMIN_BRANDS),
   tags: () => listWithFallback<CatalogTag>(API_ROUTES.TAGS, API_ROUTES.ADMIN_TAGS),
   collections: () => listWithFallback<ProductCollection>(API_ROUTES.COLLECTIONS, API_ROUTES.ADMIN_COLLECTIONS),
+  colors: () => listWithFallback<ProductColor>(API_ROUTES.COLORS, API_ROUTES.ADMIN_COLORS),
   sizeGuides: () => listWithFallback<SizeGuide>(API_ROUTES.SIZE_GUIDES, API_ROUTES.ADMIN_SIZE_GUIDES),
   orders: () => apiRequest<PaginatedResponse<Order>>(API_ROUTES.ORDERS, { auth: true }).then((r) => r.data),
   coupons: () => apiRequest<PaginatedResponse<Coupon>>(API_ROUTES.ADMIN_COUPONS, { auth: true }).then((r) => r.data),
@@ -180,6 +181,18 @@ export const adminService = {
 
   deleteCollection(collectionId: number) {
     return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_COLLECTIONS}/${collectionId}`, { method: "DELETE", auth: true });
+  },
+
+  createColor(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<ProductColor>>(API_ROUTES.ADMIN_COLORS, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteColor(colorId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_COLORS}/${colorId}`, { method: "DELETE", auth: true });
   },
 
   createSizeGuide(payload: Record<string, unknown>) {

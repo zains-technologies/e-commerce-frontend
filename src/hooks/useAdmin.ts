@@ -20,6 +20,7 @@ const emptyData: AdminDashboardData = {
   brands: [],
   tags: [],
   collections: [],
+  colors: [],
   sizeGuides: [],
   reviews: [],
   notifications: [],
@@ -65,15 +66,16 @@ export function useAdmin(section: AdminSection = "overview") {
       }
 
       if (section === "products") {
-        const [products, categories, brands, tags, collections, sizeGuides] = await Promise.all([
+        const [products, categories, brands, tags, collections, colors, sizeGuides] = await Promise.all([
           adminService.products(),
           adminService.categories(),
           adminService.brands().catch(() => []),
           adminService.tags().catch(() => []),
           adminService.collections().catch(() => []),
+          adminService.colors().catch(() => []),
           adminService.sizeGuides().catch(() => []),
         ]);
-        Object.assign(nextData, { products, categories, brands, tags, collections, sizeGuides });
+        Object.assign(nextData, { products, categories, brands, tags, collections, colors, sizeGuides });
         loadedProducts = products;
       }
 

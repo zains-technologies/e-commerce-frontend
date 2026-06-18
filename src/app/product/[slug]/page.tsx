@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
+import { Dropdown } from "@/components/common/Dropdown";
 import { ErrorState, LoadingState } from "@/components/common/StateBlock";
 import { Shell } from "@/components/layout/Shell";
 import { ProductGrid } from "@/components/product/ProductGrid";
@@ -43,6 +44,8 @@ export default function ProductDetailPage() {
   }, [slug]);
 
   const price = useMemo(() => (product ? product.price + (variant?.price_adjustment || 0) : 0), [product, variant]);
+  const selectedColorId = variant?.options?.color_id ? Number(variant.options.color_id) : null;
+  const variantOptions = useMemo(() => (product?.variants || []).map((item) => ({ label: item.attribute_value, value: String(item.id) })), [product]);
 
   async function submitReview(event: FormEvent) {
     event.preventDefault();
@@ -91,20 +94,40 @@ export default function ProductDetailPage() {
                 ) : null}
                 <p className="mt-5 text-2xl font-bold">{formatCurrency(price)}</p>
                 <p className="mt-5 max-w-xl text-sm leading-6 text-neutral-600">{product.description}</p>
-                <div className="mt-8 space-y-4">
-                  <p className="text-xs font-bold uppercase text-neutral-500">Variant</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(product.variants || []).map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => setVariant(item)}
-                        className={`rounded-full border px-4 py-2 text-sm ${variant?.id === item.id ? "border-black bg-black text-white" : "border-neutral-200"}`}
-                      >
-                        {item.attribute_value}
-                      </button>
-                    ))}
+                {product.colors?.length ? (
+                  <div className="mt-8 space-y-4">
+                    <p className="text-xs font-bold uppercase text-neutral-500">Color</p>
+                    <div className="flex flex-wrap gap-3">
+                      {product.colors.map((color) => {
+                        const colorVariant = (product.variants || []).find((item) => Number(item.options?.color_id) === color.id);
+                        const selected = selectedColorId === color.id || (!selectedColorId && !variant && product.colors?.[0]?.id === color.id);
+
+                        return (
+                          <button
+                            key={color.id}
+                            type="button"
+                            onClick={() => colorVariant && setVariant(colorVariant)}
+                            className={`inline-flex h-14 items-center gap-4 rounded-full border px-5 text-sm font-black uppercase tracking-wide transition ${selected ? "border-black" : "border-neutral-200 hover:border-black"}`}
+                          >
+                            <span className="size-9 rounded-full border border-neutral-300" style={{ backgroundColor: color.hex_code }} />
+                            {color.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : null}
+                {variantOptions.length ? (
+                  <div className="mt-8 max-w-sm space-y-3">
+                    <p className="text-xs font-bold uppercase text-neutral-500">Variant</p>
+                    <Dropdown
+                      value={variant?.id ? String(variant.id) : ""}
+                      options={variantOptions}
+                      placeholder="Select variant"
+                      onChange={(value) => setVariant((product.variants || []).find((item) => String(item.id) === value) || null)}
+                    />
+                  </div>
+                ) : null}
                 {product.size_guide && (
                   <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
                     <p className="text-xs font-bold uppercase text-neutral-500">{product.size_guide.name}</p>

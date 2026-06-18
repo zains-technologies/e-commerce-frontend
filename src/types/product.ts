@@ -32,6 +32,15 @@ export interface CatalogTag {
   slug: string;
 }
 
+export interface ProductColor {
+  id: number;
+  name: string;
+  slug: string;
+  hex_code: string;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
 export interface ProductCollection {
   id: number;
   name: string;
@@ -101,6 +110,7 @@ export interface Product {
   variants?: ProductVariant[];
   tags?: CatalogTag[];
   collections?: ProductCollection[];
+  colors?: ProductColor[];
   size_guide?: SizeGuide | null;
   specifications?: ProductSpecification[];
   reviews_summary?: {

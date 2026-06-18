@@ -332,7 +332,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
 
   return (
     <main className="min-h-screen bg-[#f6f6f3] text-black">
-      <div className={cn("grid min-h-screen transition-[grid-template-columns] duration-300 ease-out", sidebarCollapsed ? "lg:grid-cols-[88px_1fr]" : "lg:grid-cols-[280px_1fr]")}>
+      <div className={cn("grid min-h-screen transition-[grid-template-columns] duration-300 ease-out", sidebarCollapsed ? "lg:grid-cols-[96px_1fr]" : "lg:grid-cols-[280px_1fr]")}>
         <aside className="relative hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
           <button
             type="button"
@@ -343,9 +343,9 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
           >
             {sidebarCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
           </button>
-          <div className={cn("border-b border-neutral-100 py-5 transition-all duration-300", sidebarCollapsed ? "px-4" : "px-6")}>
+          <div className={cn("border-b border-neutral-100 py-5 transition-all duration-300", sidebarCollapsed ? "px-0" : "px-6")}>
             <div className={cn("flex items-center gap-3", sidebarCollapsed && "justify-center")}>
-              <Link href="/admin" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-black text-white">
+              <Link href="/admin" className={cn("grid shrink-0 place-items-center bg-black text-white transition-all duration-300", sidebarCollapsed ? "size-14 rounded-[22px]" : "size-11 rounded-2xl")}>
                 <ShoppingBag className="size-5" />
               </Link>
               <Link href="/admin" className={cn("min-w-0 overflow-hidden transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-44 opacity-100")}>
@@ -354,19 +354,19 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
               </Link>
             </div>
           </div>
-          <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-5">
+          <nav className={cn("flex-1 overflow-y-auto py-5 transition-all duration-300", sidebarCollapsed ? "space-y-3 px-0" : "space-y-1 px-4")}>
             {tabs.map((item) => (
               <Link
                 key={item}
                 href={tabHref[item]}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
-                  sidebarCollapsed && "justify-center px-0",
+                  "flex items-center gap-3 rounded-2xl text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
+                  sidebarCollapsed ? "mx-auto size-14 justify-center p-0" : "px-4 py-3",
                   tab === item && "bg-black text-white hover:bg-black hover:text-white",
                 )}
                 title={sidebarCollapsed ? tabLabels[item] : undefined}
               >
-                <MenuIcon item={item} className="size-4 shrink-0" />
+                <MenuIcon item={item} className={cn("shrink-0", sidebarCollapsed ? "size-5" : "size-4")} />
                 <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-40 opacity-100")}>{tabLabels[item]}</span>
               </Link>
             ))}

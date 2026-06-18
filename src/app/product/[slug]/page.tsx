@@ -132,9 +132,9 @@ export default function ProductDetailPage() {
                 <p className="mt-5 text-2xl font-bold">{formatCurrency(price)}</p>
                 <p className="mt-5 max-w-xl text-sm leading-6 text-neutral-600">{product.description}</p>
                 {visibleColors.length ? (
-                  <div className="mt-8 space-y-4">
+                  <div className="mt-7 space-y-3">
                     <p className="text-xs font-bold uppercase text-neutral-500">Color</p>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {visibleColors.map((color) => {
                         const colorStock = variants.filter((item) => variantMatchesColor(item, color.id, color.name)).reduce((sum, item) => sum + item.stock_quantity, 0);
                         const selected = selectedColorId === color.id || (!selectedColorId && selectedColorName.toLowerCase() === color.name.toLowerCase());
@@ -145,9 +145,9 @@ export default function ProductDetailPage() {
                             type="button"
                             disabled={colorStock <= 0}
                             onClick={() => chooseColor(color.id)}
-                            className={`inline-flex h-14 items-center gap-4 rounded-full border px-5 text-sm font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-40 ${selected ? "border-black" : "border-neutral-200 hover:border-black"}`}
+                            className={`inline-flex h-10 min-w-10 items-center gap-2 rounded-full border px-3 text-xs font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-40 ${selected ? "border-black bg-neutral-50" : "border-neutral-200 hover:border-black"}`}
                           >
-                            <span className="size-9 rounded-full border border-neutral-300" style={{ backgroundColor: color.hex_code }} />
+                            <span className="size-5 rounded-full border border-neutral-300 shadow-inner" style={{ backgroundColor: color.hex_code }} />
                             {color.name}
                           </button>
                         );
@@ -156,7 +156,7 @@ export default function ProductDetailPage() {
                   </div>
                 ) : null}
                 {hasStructuredVariants && sizeOptions.length ? (
-                  <div className="mt-8 space-y-4">
+                  <div className="mt-7 space-y-3">
                     <p className="text-xs font-bold uppercase text-neutral-500">Size</p>
                     <div className="flex flex-wrap gap-2">
                       {sizeOptions.map((size) => {
@@ -169,7 +169,7 @@ export default function ProductDetailPage() {
                             type="button"
                             disabled={disabled}
                             onClick={() => chooseSize(size)}
-                            className={`grid h-12 min-w-12 place-items-center rounded-full border px-3 text-sm font-black uppercase transition disabled:cursor-not-allowed disabled:opacity-40 ${selectedSize === size ? "border-black bg-black text-white" : "border-neutral-200 hover:border-black"}`}
+                            className={`grid h-10 min-w-10 place-items-center rounded-full border px-3 text-xs font-black uppercase transition disabled:cursor-not-allowed disabled:opacity-40 ${selectedSize === size ? "border-black bg-black text-white" : "border-neutral-200 hover:border-black"}`}
                           >
                             {size}
                           </button>

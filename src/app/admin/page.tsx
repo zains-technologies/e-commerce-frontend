@@ -793,6 +793,12 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
   const pageCount = Math.max(1, Math.ceil(products.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const paginatedProducts = useMemo(() => products.slice((safePage - 1) * pageSize, safePage * pageSize), [products, safePage, pageSize]);
+  const availableColors = useMemo(() => {
+    if (colors.length) return colors;
+    const colorMap = new Map<number, ProductColor>();
+    allProducts.forEach((product) => product.colors?.forEach((color) => colorMap.set(color.id, color)));
+    return Array.from(colorMap.values());
+  }, [allProducts, colors]);
 
   useEffect(() => {
     return () => imagePreviews.forEach((url) => URL.revokeObjectURL(url));
@@ -824,7 +830,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
       color_ids: (product.colors || []).map((color) => color.id),
       related_product_ids: (product.related_products || []).map((related) => related.id),
       specifications_text: (product.specifications || []).map((specification) => `${specification.name}: ${specification.value || ""}`).join("\n"),
-      variant_rows: (product.variants || []).map((item) => variantToDraft(item, colors)),
+      variant_rows: (product.variants || []).map((item) => variantToDraft(item, availableColors)),
     });
     setDrawerOpen(true);
   }
@@ -849,7 +855,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
 
     await run(
       async () => {
-        const payload = imageFiles.length ? productFormData(draft, imageFiles, colors) : productPayload(draft, colors);
+        const payload = imageFiles.length ? productFormData(draft, imageFiles, availableColors) : productPayload(draft, availableColors);
         if (editing && draft.id) {
           const oldImages = imageFiles.length ? editingProduct?.images || [] : [];
           const updatedProduct = await adminService.updateProduct(draft.id, payload);
@@ -939,7 +945,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
         brands={brands}
         tags={tags}
         collections={collections}
-        colors={colors}
+        colors={availableColors}
         sizeGuides={sizeGuides}
         draft={catalogDraft}
         setDraft={setCatalogDraft}
@@ -983,7 +989,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
                 <Dropdown value={draft.size_guide_id} options={[{ label: "No size guide", value: "" }, ...sizeGuides.map((guide) => ({ label: guide.name, value: String(guide.id) }))]} placeholder="Select size guide" onChange={(value) => setDraft({ ...draft, size_guide_id: value })} />
                 <CatalogMultiSelect title="Tags" items={tags} selected={draft.tag_ids} onChange={(tag_ids) => setDraft({ ...draft, tag_ids })} />
                 <CatalogMultiSelect title="Collections" items={collections} selected={draft.collection_ids} onChange={(collection_ids) => setDraft({ ...draft, collection_ids })} />
-                <ColorMultiSelect colors={colors} selected={draft.color_ids} onChange={(color_ids) => setDraft({ ...draft, color_ids })} />
+                <ColorMultiSelect colors={availableColors} selected={draft.color_ids} onChange={(color_ids) => setDraft({ ...draft, color_ids })} />
                 <CatalogMultiSelect title="Related products" items={allProducts.filter((item) => item.id !== draft.id)} selected={draft.related_product_ids} onChange={(related_product_ids) => setDraft({ ...draft, related_product_ids })} />
               </div>
             </DrawerSection>
@@ -998,7 +1004,7 @@ function ProductPanel({ products, categories, brands, tags, collections, colors,
             </DrawerSection>
 
             <DrawerSection title="Variants" className="overflow-visible">
-              <VariantBuilder basePrice={Number(draft.price || 0)} colors={colors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
+              <VariantBuilder basePrice={Number(draft.price || 0)} colors={availableColors} rows={draft.variant_rows} onChange={(variant_rows) => setDraft({ ...draft, variant_rows })} />
             </DrawerSection>
 
             <DrawerSection title="SEO">

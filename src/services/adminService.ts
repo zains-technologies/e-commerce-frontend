@@ -18,26 +18,37 @@ import type {
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
 
 type AdminPayload = Record<string, unknown> | FormData;
+type ListResponse<T> =
+  | T[]
+  | PaginatedResponse<T>
+  | SingleResponse<T[] | PaginatedResponse<T>>
+  | { success: boolean; data: T[] | PaginatedResponse<T> };
 
 function bodyFor(payload: AdminPayload) {
   return payload instanceof FormData ? payload : JSON.stringify(payload);
 }
 
+function unwrapList<T>(response: ListResponse<T>): T[] {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response.data)) return response.data;
+  if (response.data && "data" in response.data && Array.isArray(response.data.data)) return response.data.data;
+  return [];
+}
+
 async function listWithFallback<T>(primaryPath: string, fallbackPath: string) {
   try {
-    const response = await apiRequest<SingleResponse<T[]> | { success: boolean; data: T[] }>(primaryPath);
-    return response.data;
+    const response = await apiRequest<ListResponse<T>>(primaryPath, { auth: true });
+    const list = unwrapList(response);
+    if (list.length) return list;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!message.toLowerCase().includes("route") && !message.includes("404")) {
-      throw error;
-    }
-    try {
-      const response = await apiRequest<SingleResponse<T[]> | { success: boolean; data: T[] }>(fallbackPath, { auth: true });
-      return response.data;
-    } catch {
-      return [];
-    }
+    console.warn(`Catalog request failed for ${primaryPath}; trying admin route.`, error);
+  }
+
+  try {
+    const response = await apiRequest<ListResponse<T>>(fallbackPath, { auth: true });
+    return unwrapList(response);
+  } catch {
+    return [];
   }
 }
 

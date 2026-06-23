@@ -80,7 +80,7 @@ export function useProductFilters(
   category: string,
   sort: string,
   categories: Category[] = [],
-  extraFilters: { tag?: string; collection?: string } = {},
+  extraFilters: { tag?: string; collection?: string; maxPrice?: number } = {},
 ) {
   return useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -91,7 +91,8 @@ export function useProductFilters(
       const matchesCategory = category === "all" || Boolean(product.category?.slug && categorySlugs.has(product.category.slug));
       const matchesTag = !extraFilters.tag || Boolean(product.tags?.some((tag) => tag.slug === extraFilters.tag));
       const matchesCollection = !extraFilters.collection || Boolean(product.collections?.some((collection) => collection.slug === extraFilters.collection));
-      return matchesSearch && matchesCategory && matchesTag && matchesCollection;
+      const matchesPrice = typeof extraFilters.maxPrice !== "number" || product.price <= extraFilters.maxPrice;
+      return matchesSearch && matchesCategory && matchesTag && matchesCollection && matchesPrice;
     });
 
     if (sort === "price-low") result = [...result].sort((a, b) => a.price - b.price);
@@ -99,7 +100,7 @@ export function useProductFilters(
     if (sort === "featured") result = [...result].sort((a, b) => Number(b.is_featured) - Number(a.is_featured));
 
     return result;
-  }, [products, search, category, sort, categories, extraFilters.tag, extraFilters.collection]);
+  }, [products, search, category, sort, categories, extraFilters.tag, extraFilters.collection, extraFilters.maxPrice]);
 }
 
 function collectDescendantSlugs(category: Category | undefined, categories: Category[]): string[] {

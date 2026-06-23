@@ -22,6 +22,7 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState("");
   const [variant, setVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [review, setReview] = useState({
     customer_name: "",
     customer_email: "",
@@ -79,6 +80,7 @@ export default function ProductDetailPage() {
   const activeStock = variant
     ? variant.stock_quantity
     : product?.stock_quantity || 0;
+  const stockTone = getStockTone(activeStock);
   const variantOptions = useMemo(
     () =>
       variants.map((item) => ({
@@ -101,6 +103,10 @@ export default function ProductDetailPage() {
   const visibleColors = useMemo(
     () => deriveVariantColors(product, variants, catalogColors),
     [catalogColors, product, variants],
+  );
+  const sizeGuide = useMemo(
+    () => buildSizeGuide(product, sizeOptions),
+    [product, sizeOptions],
   );
 
   function chooseColor(colorId: number) {
@@ -260,9 +266,21 @@ export default function ProductDetailPage() {
                 ) : null}
                 {hasStructuredVariants && sizeOptions.length ? (
                   <div className="mt-7 space-y-3">
-                    <p className="text-xs font-bold uppercase text-neutral-500">
-                      Size
-                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs font-bold uppercase text-neutral-500">
+                        Size
+                      </p>
+                      {sizeGuide.rows.length ? (
+                        <button
+                          type="button"
+                          onClick={() => setSizeGuideOpen(true)}
+                          className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-2 text-xs font-bold uppercase text-neutral-600 transition hover:border-black hover:text-black"
+                        >
+                          <RulerIcon />
+                          Size guide
+                        </button>
+                      ) : null}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {sizeOptions.map((size) => {
                         const sizeVariant = variants.find(
@@ -311,25 +329,12 @@ export default function ProductDetailPage() {
                     />
                   </div>
                 ) : null}
-                <p
-                  className={`mt-5 text-sm font-bold ${activeStock <= 0 ? "text-red-600" : "text-neutral-500"}`}
-                >
+                <div className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold uppercase ${stockTone.className}`}>
+                  <span className="size-2 rounded-full bg-current" />
                   {activeStock > 0
                     ? `${activeStock} in stock${variant ? ` · ${variant.sku || variant.attribute_value}` : ""}`
                     : "Out of stock"}
-                </p>
-                {/* {product.size_guide && (
-                  <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
-                    <p className="text-xs font-bold uppercase text-neutral-500">
-                      {product.size_guide.name}
-                    </p>
-                    {product.size_guide.notes && (
-                      <p className="mt-2 text-sm text-neutral-600">
-                        {product.size_guide.notes}
-                      </p>
-                    )}
-                  </div>
-                )} */}
+                </div>
                 {product.specifications?.length ? (
                   <div className="mt-8 rounded-[24px] border border-neutral-200 p-4">
                     <p className="mb-3 text-xs font-bold uppercase text-neutral-500">
@@ -570,10 +575,136 @@ export default function ProductDetailPage() {
               />
               <Button className="mt-4">Submit review</Button>
             </form>
+            {sizeGuideOpen && sizeGuide.rows.length ? (
+              <SizeGuideModal
+                title={sizeGuide.title}
+                columns={sizeGuide.columns}
+                rows={sizeGuide.rows}
+                notes={product.size_guide?.notes}
+                onClose={() => setSizeGuideOpen(false)}
+              />
+            ) : null}
           </>
         )}
       </section>
     </Shell>
+  );
+}
+
+function getStockTone(stock: number) {
+  if (stock <= 0) {
+    return { label: "Out of stock", className: "bg-red-50 text-red-700" };
+  }
+
+  if (stock <= 10) {
+    return { label: "Low stock", className: "bg-red-50 text-red-700" };
+  }
+
+  return { label: "In stock", className: "bg-green-50 text-green-700" };
+}
+
+function buildSizeGuide(product: Product | null, availableSizes: string[]) {
+  const rows = product?.size_guide?.rows || [];
+  if (rows.length) {
+    const columns = Object.keys(rows[0]);
+    return {
+      title: product?.size_guide?.name || "Size guide",
+      columns,
+      rows: rows.map((row) => columns.map((column) => String(row[column] || ""))),
+    };
+  }
+
+  const standardRows = [
+    { size: "XS", uk: "6-8", us: "2-4", eu: "34-36" },
+    { size: "S", uk: "8-10", us: "4-6", eu: "36-38" },
+    { size: "M", uk: "10-12", us: "6-8", eu: "38-40" },
+    { size: "L", uk: "12-14", us: "8-10", eu: "40-42" },
+    { size: "XL", uk: "14-16", us: "10-12", eu: "42-44" },
+    { size: "XXL", uk: "16-18", us: "12-14", eu: "44-46" },
+    { size: "XXXL", uk: "18-20", us: "14-16", eu: "46-48" },
+  ];
+  const normalizedAvailableSizes = new Set(availableSizes.map(normalizeSizeLabel));
+  const filteredRows = standardRows.filter((row) => normalizedAvailableSizes.has(normalizeSizeLabel(row.size)));
+
+  return {
+    title: "Size guide",
+    columns: ["Size", "UK", "US", "EU"],
+    rows: filteredRows.map((row) => [row.size, row.uk, row.us, row.eu]),
+  };
+}
+
+function normalizeSizeLabel(value: string) {
+  return value.trim().toUpperCase().replace(/^2XL$/, "XXL").replace(/^3XL$/, "XXXL");
+}
+
+function RulerIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 17 17 4l3 3L7 20l-3-3Z" />
+      <path d="m14 7 3 3" />
+      <path d="m11 10 2 2" />
+      <path d="m8 13 3 3" />
+    </svg>
+  );
+}
+
+function SizeGuideModal({
+  title,
+  columns,
+  rows,
+  notes,
+  onClose,
+}: {
+  title: string;
+  columns: string[];
+  rows: string[][];
+  notes?: string | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/45 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="mx-auto flex max-h-[calc(100vh-3rem)] max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+          <div>
+            <p className="text-xs font-bold uppercase text-neutral-500">Find your fit</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-[-0.04em]">{title}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full border border-neutral-200 transition hover:border-black" aria-label="Close size guide">
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="overflow-auto p-5">
+          {notes ? <p className="mb-4 text-sm leading-6 text-neutral-600">{notes}</p> : null}
+          <table className="w-full min-w-[520px] overflow-hidden rounded-[18px] border border-neutral-200 text-center text-sm">
+            <thead className="bg-neutral-100 text-xs uppercase text-neutral-600">
+              <tr>
+                {columns.map((column) => (
+                  <th key={column} className="border-b border-r border-neutral-200 px-4 py-4 last:border-r-0">{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`${row[0]}-${rowIndex}`} className="even:bg-neutral-50">
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${cell}-${cellIndex}`} className="border-b border-r border-neutral-200 px-4 py-4 last:border-r-0 last:font-bold">{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </svg>
   );
 }
 

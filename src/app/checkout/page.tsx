@@ -142,9 +142,21 @@ export default function CheckoutPage() {
                 <div className="rounded-[24px] border border-neutral-200 bg-neutral-50 p-4">
                   <p className="text-sm font-bold">Bank transfer details</p>
                   <p className="mt-1 text-xs leading-5 text-neutral-500">Add the transfer reference now, or upload a receipt so the admin can verify it from Payments.</p>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1.15fr]">
                     <Input placeholder="Transfer reference" value={bankReference} onChange={(e) => setBankReference(e.target.value)} />
-                    <Input type="file" accept="image/*,.pdf" onChange={(e) => setBankReceipt(e.target.files?.[0] || null)} />
+                    <label className="group flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-[22px] border border-dashed border-neutral-300 bg-white px-4 py-3 transition hover:border-black">
+                      <input className="sr-only" type="file" accept="image/*,.pdf" onChange={(e) => setBankReceipt(e.target.files?.[0] || null)} />
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-neutral-100 text-black transition group-hover:bg-black group-hover:text-white">
+                          <UploadIcon />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold">{bankReceipt?.name || "Upload payment receipt"}</span>
+                          <span className="mt-0.5 block text-xs text-neutral-500">PNG, JPG, WEBP, or PDF</span>
+                        </span>
+                      </span>
+                      <span className="shrink-0 rounded-full border border-neutral-200 px-3 py-2 text-[11px] font-bold uppercase">Choose</span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -165,5 +177,15 @@ export default function CheckoutPage() {
         )}
       </section>
     </Shell>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 15V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
+    </svg>
   );
 }

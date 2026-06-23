@@ -6,13 +6,13 @@ import { formatCurrency, getPrimaryImage, getToken } from "@/lib/utils";
 import { wishlistService } from "@/services/wishlistService";
 import type { Product } from "@/types/product";
 
-export function ProductCard({ product, wide = false }: { product: Product; wide?: boolean }) {
+export function ProductCard({ product }: { product: Product }) {
   const { addItem, busy } = useCart();
 
   return (
-    <article className={wide ? "md:col-span-2" : ""}>
-      <Link href={`/product/${product.slug}`} className="group block">
-        <div className="relative aspect-[1.05] overflow-hidden rounded-[24px] bg-neutral-100 md:rounded-[28px]">
+    <article className="h-full">
+      <Link href={`/product/${product.slug}`} className="group flex h-full flex-col">
+        <div className="relative aspect-[0.92] overflow-hidden rounded-[24px] bg-neutral-100 md:rounded-[28px]">
           <img
             src={getPrimaryImage(product.images)}
             alt={product.name}
@@ -35,15 +35,15 @@ export function ProductCard({ product, wide = false }: { product: Product; wide?
             ♥
           </button>
         </div>
-        <div className="mt-3">
-          <h3 className="font-bold">{product.name}</h3>
+        <div className="mt-3 flex flex-1 flex-col">
+          <h3 className="line-clamp-2 min-h-12 font-bold leading-6">{product.name}</h3>
           {product.reviews_summary?.count ? (
             <p className="mt-1 text-xs font-bold text-neutral-500">★ {product.reviews_summary.average_rating} · {product.reviews_summary.count} reviews</p>
           ) : null}
           <p className="text-sm text-neutral-600">{formatCurrency(product.price)}</p>
           <button
             type="button"
-            className="mt-3 rounded-full bg-black px-4 py-2 text-xs font-bold uppercase text-white transition hover:bg-neutral-800"
+            className="mt-auto w-fit rounded-full bg-black px-4 py-2 text-xs font-bold uppercase text-white transition hover:bg-neutral-800"
             disabled={busy}
             onClick={(event) => {
               event.preventDefault();

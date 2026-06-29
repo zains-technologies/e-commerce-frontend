@@ -61,6 +61,15 @@ const tabs = menuItems.map((item) => item.key);
 const tabLabels = Object.fromEntries(menuItems.map((item) => [item.key, item.name])) as Record<Tab, string>;
 const tabHref = Object.fromEntries(menuItems.map((item) => [item.key, item.path])) as Record<Tab, string>;
 const tabDescriptions = Object.fromEntries(menuItems.map((item) => [item.key, item.description])) as Record<Tab, string>;
+const sidebarGroups: Array<{ label: string; items: Tab[] }> = [
+  { label: "Command", items: ["overview", "store"] },
+  { label: "Catalog", items: ["products", "categories", "inventory"] },
+  { label: "Sales", items: ["orders", "payments", "coupons", "invoices", "returns"] },
+  { label: "Fulfillment", items: ["shipping", "delivery", "branches"] },
+  { label: "Customers", items: ["reviews", "questions", "support", "newsletter", "communications"] },
+  { label: "Growth", items: ["marketing", "reports", "analytics"] },
+  { label: "Access", items: ["staff", "audit"] },
+];
 const iconMap: Record<IconName, ComponentType<{ className?: string }>> = {
   Building2,
   ChartNoAxesCombined,
@@ -375,7 +384,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
   return (
     <main className="min-h-screen bg-[#f6f6f3] text-black">
       <div className={cn("grid min-h-screen transition-[grid-template-columns] duration-300 ease-out", sidebarCollapsed ? "lg:grid-cols-[76px_1fr]" : "lg:grid-cols-[280px_1fr]")}>
-        <aside className="relative hidden border-r border-neutral-200 bg-white lg:flex lg:flex-col">
+        <aside className="sticky top-0 hidden h-screen border-r border-neutral-200 bg-white lg:flex lg:flex-col">
           <button
             type="button"
             className="absolute -right-4 top-24 z-50 grid size-8 place-items-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition hover:border-black hover:text-black"
@@ -396,22 +405,36 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
               </Link>
             </div>
           </div>
-          <nav className={cn("flex-1 overflow-y-auto py-5 transition-all duration-300", sidebarCollapsed ? "space-y-2 px-0" : "space-y-1 px-4")}>
-            {tabs.map((item) => (
-              <Link
-                key={item}
-                href={tabHref[item]}
-                className={cn(
-                  "flex items-center rounded-2xl text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
-                  sidebarCollapsed ? "mx-auto size-11 justify-center gap-0 p-0" : "gap-3 px-4 py-3",
-                  tab === item && "bg-black text-white hover:bg-black hover:text-white",
-                )}
-                title={sidebarCollapsed ? tabLabels[item] : undefined}
-              >
-                <MenuIcon item={item} className="size-4 shrink-0" />
-                <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-40 opacity-100")}>{tabLabels[item]}</span>
-              </Link>
-            ))}
+          <nav className={cn("min-h-0 flex-1 overflow-y-auto py-4 transition-all duration-300", sidebarCollapsed ? "space-y-3 px-0" : "space-y-4 px-4")}>
+            {sidebarGroups.map((group) => {
+              const visibleItems = group.items.filter((item) => tabHref[item]);
+              const activeInGroup = visibleItems.includes(tab);
+              return (
+                <section key={group.label} className={cn("transition-all duration-300", sidebarCollapsed ? "space-y-2" : "space-y-1")}>
+                  <div className={cn("flex items-center gap-2 px-3", sidebarCollapsed ? "justify-center px-0" : "justify-between")}>
+                    <p className={cn("text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400 transition-all duration-300", sidebarCollapsed ? "sr-only" : "block")}>{group.label}</p>
+                    {sidebarCollapsed && <span className={cn("h-px w-7 rounded-full", activeInGroup ? "bg-black" : "bg-neutral-200")} />}
+                  </div>
+                  <div className={cn("space-y-1", sidebarCollapsed ? "px-0" : "px-0")}>
+                    {visibleItems.map((item) => (
+                      <Link
+                        key={item}
+                        href={tabHref[item]}
+                        className={cn(
+                          "group flex items-center rounded-2xl text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
+                          sidebarCollapsed ? "mx-auto size-11 justify-center gap-0 p-0" : "gap-3 px-4 py-2.5",
+                          tab === item && "bg-black text-white shadow-sm hover:bg-black hover:text-white",
+                        )}
+                        title={sidebarCollapsed ? `${group.label} · ${tabLabels[item]}` : undefined}
+                      >
+                        <MenuIcon item={item} className="size-4 shrink-0" />
+                        <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-40 opacity-100")}>{tabLabels[item]}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </nav>
           <div className="border-t border-neutral-100 p-4">
             <div className={cn("overflow-hidden rounded-[24px] bg-[#d8dfcc] transition-all duration-300", sidebarCollapsed ? "max-h-0 p-0 opacity-0" : "max-h-40 p-4 opacity-100")}>

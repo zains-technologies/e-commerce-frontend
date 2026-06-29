@@ -92,9 +92,13 @@ export function useAdmin(section: AdminSection = "overview") {
       }
 
       if (section === "orders") {
-        const orders = await adminService.orders();
-        nextData.orders = orders;
+        const [orders, products] = await Promise.all([
+          adminService.orders(),
+          adminService.products().catch(() => []),
+        ]);
+        Object.assign(nextData, { orders, products });
         loadedOrders = orders;
+        loadedProducts = products;
       }
 
       if (section === "coupons") {

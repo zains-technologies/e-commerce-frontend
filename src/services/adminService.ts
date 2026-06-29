@@ -312,6 +312,14 @@ export const adminService = {
     }).then((r) => r.data);
   },
 
+  createManualOrder(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<Order>>("/admin/orders", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
   refundOrder(orderId: number, reason?: string) {
     return apiRequest<SingleResponse<Order>>(`/admin/orders/${orderId}/refund`, {
       method: "POST",

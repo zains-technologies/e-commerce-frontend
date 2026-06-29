@@ -198,6 +198,31 @@ type RestockDraft = {
   note: string;
 };
 
+type ManualOrderItemDraft = {
+  id: string;
+  product_id: string;
+  product_variant_id: string;
+  quantity: string;
+  unit_price: string;
+};
+
+type ManualOrderDraft = {
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  delivery_address: string;
+  shipping_method: string;
+  order_notes: string;
+  payment_method: string;
+  payment_status: string;
+  status: string;
+  discount_total: string;
+  delivery_fee: string;
+  tax_total: string;
+  reduce_stock: boolean;
+  items: ManualOrderItemDraft[];
+};
+
 type CatalogQuickDraft = {
   brand: string;
   tag: string;
@@ -260,6 +285,22 @@ const emptyBranch: BranchDraft = { name: "", phone: "", address: "", is_active: 
 const emptyStaff: StaffDraft = { name: "", email: "", phone: "", role: "staff", permissions: ["products.view", "orders.view"], password: "password" };
 const emptyStore: StoreDraft = { name: "", email: "", phone: "", address: "", currency: "LKR", domain: "localhost", custom_domain: "", plan: "simple", primary: "#111111", secondary: "#d8dfcc", accent: "#ef4444", delivery_fee: "0", notice_enabled: false, notice_message: "", notice_coupon_code: "", notice_href: "/products" };
 const emptyRestock: RestockDraft = { variant_id: "", quantity: "10", type: "restock", note: "Manual restock from admin panel" };
+const emptyManualOrder: ManualOrderDraft = {
+  customer_name: "",
+  customer_email: "",
+  customer_phone: "",
+  delivery_address: "",
+  shipping_method: "manual",
+  order_notes: "Manual order created by admin.",
+  payment_method: "manual",
+  payment_status: "pending",
+  status: "processing",
+  discount_total: "0",
+  delivery_fee: "0",
+  tax_total: "0",
+  reduce_stock: true,
+  items: [{ id: "row-1", product_id: "", product_variant_id: "", quantity: "1", unit_price: "" }],
+};
 const emptyCatalogQuick: CatalogQuickDraft = { brand: "", tag: "", collection: "", color: "", colorHex: "#111111", sizeGuide: "" };
 const emptyShipping: ShippingDraft = { name: "", code: "", description: "", fee: "0", min_order_total: "", sort_order: "0", is_active: true };
 const emptyBanner: BannerDraft = { title: "", subtitle: "", current_image_url: "", link_url: "/products", position: "home_hero", starts_at: "", ends_at: "", sort_order: "0", is_active: true };
@@ -268,6 +309,7 @@ const productStatusOptions = [{ label: "Active", value: "active" }, { label: "In
 const couponTypeOptions = [{ label: "Percentage", value: "percentage" }, { label: "Fixed", value: "fixed" }];
 const orderStatusOptions = ["pending", "paid", "processing", "shipped", "delivered", "cancelled"].map((status) => ({ label: titleCase(status), value: status }));
 const paymentStatusOptions = ["pending", "paid", "failed", "refunded"].map((status) => ({ label: titleCase(status), value: status }));
+const manualPaymentMethodOptions = ["manual", "cash", "cod", "bank_transfer", "card", "payhere"].map((method) => ({ label: titleCase(method), value: method }));
 const staffRoleOptions = [{ label: "Admin", value: "admin" }, { label: "Manager", value: "manager" }, { label: "Staff", value: "staff" }];
 const inventoryTypeOptions = ["restock", "adjustment", "damage", "return"].map((value) => ({ label: titleCase(value), value }));
 const staffPermissionOptions = ["products.view", "products.update", "orders.view", "orders.update", "reports.view", "inventory.update"].map((value) => ({ label: value, value }));
@@ -477,7 +519,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
               )}
 
               {tab === "orders" && (
-                <OrderPanel orders={data.orders} busy={busy} run={run} />
+                <OrderPanel orders={data.orders} products={data.products} busy={busy} run={run} />
               )}
 
               {tab === "coupons" && (
@@ -1580,12 +1622,119 @@ function CategoryPanel({ categories, busy, run }: { categories: Category[]; busy
   );
 }
 
-function OrderPanel({ orders, busy, run }: { orders: Order[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+function OrderPanel({ orders, products, busy, run }: { orders: Order[]; products: Product[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [selected, setSelected] = useState<Order | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualDraft, setManualDraft] = useState<ManualOrderDraft>(emptyManualOrder);
+  const productOptions = products.map((product) => ({ label: `${product.name} · ${formatCurrency(product.price)}`, value: String(product.id) }));
+  const manualSubtotal = manualDraft.items.reduce((sum, item) => {
+    const product = products.find((entry) => String(entry.id) === item.product_id);
+    const variant = product?.variants?.find((entry) => String(entry.id) === item.product_variant_id);
+    const unit = Number(item.unit_price || 0) || Number(product?.price || 0) + Number(variant?.price_adjustment || 0);
+    return sum + unit * Number(item.quantity || 0);
+  }, 0);
+  const manualTotal = Math.max(0, manualSubtotal - Number(manualDraft.discount_total || 0) + Number(manualDraft.delivery_fee || 0) + Number(manualDraft.tax_total || 0));
+
+  function updateManualItem(rowId: string, patch: Partial<ManualOrderItemDraft>) {
+    setManualDraft((current) => ({
+      ...current,
+      items: current.items.map((item) => {
+        if (item.id !== rowId) return item;
+        const next = { ...item, ...patch };
+        if (patch.product_id !== undefined) {
+          const product = products.find((entry) => String(entry.id) === patch.product_id);
+          next.product_variant_id = "";
+          next.unit_price = product ? String(product.price) : "";
+        }
+        if (patch.product_variant_id !== undefined) {
+          const product = products.find((entry) => String(entry.id) === next.product_id);
+          const variant = product?.variants?.find((entry) => String(entry.id) === patch.product_variant_id);
+          if (product) next.unit_price = String(Number(product.price || 0) + Number(variant?.price_adjustment || 0));
+        }
+        return next;
+      }),
+    }));
+  }
+
+  async function submitManualOrder(event: FormEvent) {
+    event.preventDefault();
+    const validItems = manualDraft.items.filter((item) => item.product_id && Number(item.quantity) > 0);
+    if (!validItems.length) return;
+
+    await run(() => adminService.createManualOrder({
+      ...manualDraft,
+      discount_total: Number(manualDraft.discount_total || 0),
+      delivery_fee: Number(manualDraft.delivery_fee || 0),
+      tax_total: Number(manualDraft.tax_total || 0),
+      items: validItems.map((item) => ({
+        product_id: Number(item.product_id),
+        product_variant_id: item.product_variant_id ? Number(item.product_variant_id) : null,
+        quantity: Number(item.quantity || 1),
+        unit_price: item.unit_price === "" ? null : Number(item.unit_price),
+      })),
+    }), "Manual order created.");
+    setManualDraft(emptyManualOrder);
+    setManualOpen(false);
+  }
 
   return (
     <AdminCard>
-      <PanelTitle title="Order management" subtitle="Update order, payment, delivery status, and tracking numbers." />
+      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <PanelTitle title="Order management" subtitle="Update orders or create manual orders from WhatsApp, phone, Instagram, or walk-in sales." />
+        <Button type="button" onClick={() => { setManualDraft(emptyManualOrder); setManualOpen(true); }}>Create manual order</Button>
+      </div>
+      <Drawer open={manualOpen} title="Create manual order" subtitle="Use this for WhatsApp, phone, social media, or in-store orders entered by staff." size="wide" onClose={() => setManualOpen(false)}>
+        <form onSubmit={submitManualOrder} className="grid gap-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input required placeholder="Customer name" value={manualDraft.customer_name} onChange={(e) => setManualDraft({ ...manualDraft, customer_name: e.target.value })} />
+            <Input type="email" placeholder="Customer email" value={manualDraft.customer_email} onChange={(e) => setManualDraft({ ...manualDraft, customer_email: e.target.value })} />
+            <Input placeholder="Customer phone" value={manualDraft.customer_phone} onChange={(e) => setManualDraft({ ...manualDraft, customer_phone: e.target.value })} />
+          </div>
+          <textarea required placeholder="Delivery address" value={manualDraft.delivery_address} onChange={(e) => setManualDraft({ ...manualDraft, delivery_address: e.target.value })} className="min-h-24 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" />
+          <div className="grid gap-3 md:grid-cols-4">
+            <Dropdown value={manualDraft.payment_method} options={manualPaymentMethodOptions} onChange={(value) => setManualDraft({ ...manualDraft, payment_method: value })} />
+            <Dropdown value={manualDraft.payment_status} options={paymentStatusOptions} onChange={(value) => setManualDraft({ ...manualDraft, payment_status: value })} />
+            <Dropdown value={manualDraft.status} options={orderStatusOptions} onChange={(value) => setManualDraft({ ...manualDraft, status: value })} />
+            <Input placeholder="Shipping method" value={manualDraft.shipping_method} onChange={(e) => setManualDraft({ ...manualDraft, shipping_method: e.target.value })} />
+          </div>
+          <div className="rounded-[24px] border border-neutral-200 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-black">Order items</p>
+              <Button type="button" className="h-9 px-4" variant="outline" onClick={() => setManualDraft({ ...manualDraft, items: [...manualDraft.items, { id: `row-${Date.now()}`, product_id: "", product_variant_id: "", quantity: "1", unit_price: "" }] })}>Add item</Button>
+            </div>
+            <div className="grid gap-3">
+              {manualDraft.items.map((item, index) => {
+                const product = products.find((entry) => String(entry.id) === item.product_id);
+                const variantOptions = [{ label: "No variant", value: "" }, ...(product?.variants || []).map((variant) => ({ label: `${variant.attribute_value} · ${variant.stock_quantity} stock`, value: String(variant.id) }))];
+                const unit = Number(item.unit_price || 0) || Number(product?.price || 0);
+                const lineTotal = unit * Number(item.quantity || 0);
+                return (
+                  <div key={item.id} className="grid gap-3 rounded-[22px] bg-neutral-50 p-3 md:grid-cols-[1.5fr_1fr_.6fr_.7fr_.7fr_auto] md:items-center">
+                    <Dropdown value={item.product_id} options={[{ label: "Choose product", value: "" }, ...productOptions]} onChange={(value) => updateManualItem(item.id, { product_id: value })} />
+                    <Dropdown value={item.product_variant_id} options={variantOptions} onChange={(value) => updateManualItem(item.id, { product_variant_id: value })} />
+                    <Input type="number" min={1} placeholder="Qty" value={item.quantity} onChange={(e) => updateManualItem(item.id, { quantity: e.target.value })} />
+                    <Input type="number" min={0} placeholder="Unit price" value={item.unit_price} onChange={(e) => updateManualItem(item.id, { unit_price: e.target.value })} />
+                    <p className="px-2 text-sm font-black">{formatCurrency(lineTotal)}</p>
+                    <Button type="button" className="h-9 px-3" variant="outline" disabled={manualDraft.items.length === 1} onClick={() => setManualDraft({ ...manualDraft, items: manualDraft.items.filter((_, itemIndex) => itemIndex !== index) })}>Remove</Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <Input type="number" placeholder="Discount" value={manualDraft.discount_total} onChange={(e) => setManualDraft({ ...manualDraft, discount_total: e.target.value })} />
+            <Input type="number" placeholder="Delivery fee" value={manualDraft.delivery_fee} onChange={(e) => setManualDraft({ ...manualDraft, delivery_fee: e.target.value })} />
+            <Input type="number" placeholder="Tax" value={manualDraft.tax_total} onChange={(e) => setManualDraft({ ...manualDraft, tax_total: e.target.value })} />
+            <div className="rounded-[22px] bg-black px-4 py-3 text-white">
+              <p className="text-xs uppercase text-white/60">Total</p>
+              <p className="text-xl font-black">{formatCurrency(manualTotal)}</p>
+            </div>
+          </div>
+          <textarea placeholder="Order notes" value={manualDraft.order_notes} onChange={(e) => setManualDraft({ ...manualDraft, order_notes: e.target.value })} className="min-h-20 w-full rounded-[24px] border border-neutral-200 p-4 text-sm outline-none focus:border-black" />
+          <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={manualDraft.reduce_stock} onChange={(e) => setManualDraft({ ...manualDraft, reduce_stock: e.target.checked })} /> Reduce stock when order is created</label>
+          <div className="flex gap-2"><Button disabled={busy || !products.length}>Create order</Button><Button type="button" variant="outline" onClick={() => setManualOpen(false)}>Cancel</Button></div>
+        </form>
+      </Drawer>
       <OrderTable orders={orders} action={(order) => (
         <div className="grid gap-2">
           <Button className="h-8 px-3" variant="outline" onClick={() => setSelected(order)}>Details</Button>

@@ -17,6 +17,7 @@ import {
 import {
   Building2,
   ChartNoAxesCombined,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -341,6 +342,7 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
   const [search, setSearch] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [openSidebarGroup, setOpenSidebarGroup] = useState(() => sidebarGroups.find((group) => group.items.includes(initialTab))?.label || "Command");
 
   const revenue = data.salesReport?.total_revenue || data.orders.reduce((sum, order) => sum + order.total, 0);
   const pendingOrders = data.orders.filter((order) => order.status === "pending").length;
@@ -409,29 +411,58 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
             {sidebarGroups.map((group) => {
               const visibleItems = group.items.filter((item) => tabHref[item]);
               const activeInGroup = visibleItems.includes(tab);
+              const open = openSidebarGroup === group.label;
+              const firstItem = visibleItems[0];
               return (
-                <section key={group.label} className={cn("transition-all duration-300", sidebarCollapsed ? "space-y-2" : "space-y-1")}>
-                  <div className={cn("flex items-center gap-2 px-3", sidebarCollapsed ? "justify-center px-0" : "justify-between")}>
-                    <p className={cn("text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400 transition-all duration-300", sidebarCollapsed ? "sr-only" : "block")}>{group.label}</p>
-                    {sidebarCollapsed && <span className={cn("h-px w-7 rounded-full", activeInGroup ? "bg-black" : "bg-neutral-200")} />}
-                  </div>
-                  <div className={cn("space-y-1", sidebarCollapsed ? "px-0" : "px-0")}>
-                    {visibleItems.map((item) => (
-                      <Link
-                        key={item}
-                        href={tabHref[item]}
-                        className={cn(
-                          "group flex items-center rounded-2xl text-sm font-bold text-neutral-600 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
-                          sidebarCollapsed ? "mx-auto size-11 justify-center gap-0 p-0" : "gap-3 px-4 py-2.5",
-                          tab === item && "bg-black text-white shadow-sm hover:bg-black hover:text-white",
-                        )}
-                        title={sidebarCollapsed ? `${group.label} · ${tabLabels[item]}` : undefined}
-                      >
-                        <MenuIcon item={item} className="size-4 shrink-0" />
-                        <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", sidebarCollapsed ? "w-0 opacity-0" : "w-40 opacity-100")}>{tabLabels[item]}</span>
-                      </Link>
-                    ))}
-                  </div>
+                <section key={group.label} className="space-y-1 transition-all duration-300">
+                  {sidebarCollapsed ? (
+                    <Link
+                      href={firstItem ? tabHref[firstItem] : "/admin"}
+                      className={cn(
+                        "mx-auto grid size-11 place-items-center rounded-2xl text-neutral-600 transition hover:bg-neutral-100 hover:text-black",
+                        activeInGroup && "bg-black text-white shadow-sm hover:bg-black hover:text-white",
+                      )}
+                      title={group.label}
+                    >
+                      {firstItem && <MenuIcon item={firstItem} className="size-4" />}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black transition-all duration-200",
+                        activeInGroup || open ? "bg-black text-white shadow-sm" : "text-neutral-700 hover:bg-neutral-100 hover:text-black",
+                      )}
+                      onClick={() => setOpenSidebarGroup(open ? "" : group.label)}
+                    >
+                      <span className="flex items-center gap-3">
+                        {firstItem && <MenuIcon item={firstItem} className="size-4 shrink-0" />}
+                        <span>{group.label}</span>
+                      </span>
+                      <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", open && "rotate-180")} />
+                    </button>
+                  )}
+                  {!sidebarCollapsed && (
+                    <div className={cn("grid overflow-hidden transition-all duration-300 ease-out", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
+                      <div className="min-h-0">
+                        <div className="ml-5 mt-1 space-y-1 border-l border-neutral-200 pl-3">
+                          {visibleItems.map((item) => (
+                            <Link
+                              key={item}
+                              href={tabHref[item]}
+                              className={cn(
+                                "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold text-neutral-500 transition-all duration-200 hover:bg-neutral-100 hover:text-black",
+                                tab === item && "bg-neutral-100 text-black",
+                              )}
+                            >
+                              <MenuIcon item={item} className="size-4 shrink-0" />
+                              <span>{tabLabels[item]}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </section>
               );
             })}

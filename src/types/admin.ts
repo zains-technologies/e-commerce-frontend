@@ -39,6 +39,120 @@ export interface Payment {
   created_at?: string;
 }
 
+export interface PaymentLog {
+  id: number;
+  order?: { id: number; order_number: string } | null;
+  provider: string;
+  event: string;
+  status: string;
+  payload?: Record<string, unknown> | null;
+  created_at?: string;
+}
+
+export interface PaymentEvidence {
+  id: number;
+  order_id: number;
+  payment_id?: number | null;
+  order?: { id: number; order_number: string } | null;
+  method: string;
+  file_path?: string | null;
+  url?: string | null;
+  reference?: string | null;
+  note?: string | null;
+  status: string;
+  created_at?: string;
+}
+
+export interface DeliveryZone {
+  id: number;
+  name: string;
+  city?: string | null;
+  postal_code?: string | null;
+  fee: number;
+  estimated_days?: number | null;
+  is_active: boolean;
+  sort_order?: number;
+  created_at?: string;
+}
+
+export interface DeliveryProof {
+  id: number;
+  order?: { id: number; order_number: string } | null;
+  status: string;
+  recipient_name?: string | null;
+  photo_path?: string | null;
+  url?: string | null;
+  note?: string | null;
+  delivered_at?: string | null;
+  created_at?: string;
+}
+
+export interface ReturnRequest {
+  id: number;
+  request_number: string;
+  order?: { id: number; order_number: string } | null;
+  type: "return" | "exchange";
+  status: string;
+  reason: string;
+  customer_note?: string | null;
+  admin_note?: string | null;
+  refund_amount: number;
+  resolved_at?: string | null;
+  created_at?: string;
+}
+
+export interface Invoice {
+  id: number;
+  order?: { id: number; order_number: string } | null;
+  invoice_number: string;
+  subtotal: number;
+  tax_total: number;
+  delivery_fee: number;
+  discount_total: number;
+  total: number;
+  status: string;
+  issued_at?: string | null;
+  created_at?: string;
+}
+
+export interface CommunicationLog {
+  id: number;
+  channel: string;
+  event: string;
+  recipient?: string | null;
+  subject?: string | null;
+  status: string;
+  created_at?: string;
+  sent_at?: string | null;
+}
+
+export interface SupportTicket {
+  id: number;
+  ticket_number: string;
+  order?: { id: number; order_number: string } | null;
+  customer_name: string;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  subject: string;
+  status: string;
+  priority: string;
+  messages?: Array<{ id: number; sender_type: string; message: string; created_at?: string }>;
+  created_at?: string;
+}
+
+export interface AnalyticsReport {
+  sessions: number;
+  product_views: number;
+  cart_adds: number;
+  checkout_starts: number;
+  conversion_rate: number;
+  cart_abandonment_rate: number;
+  average_order_value: number;
+  repeat_customers: number;
+  customer_lifetime_value: number;
+  revenue_by_channel: Array<{ channel: string; revenue: number }>;
+}
+
 export interface Coupon {
   id: number;
   code: string;
@@ -115,6 +229,10 @@ export interface StoreSettings {
       coupon_code?: string;
       href?: string;
     };
+    communication?: Record<string, unknown>;
+    integrations?: Record<string, unknown>;
+    tax?: Record<string, unknown>;
+    courier?: Record<string, unknown>;
     [key: string]: unknown;
   } | null;
 }
@@ -162,6 +280,15 @@ export interface AdminDashboardData {
   newsletterSubscribers?: NewsletterSubscriber[];
   questions?: ProductQuestion[];
   auditLogs?: AuditLog[];
+  paymentLogs?: PaymentLog[];
+  paymentEvidences?: PaymentEvidence[];
+  deliveryZones?: DeliveryZone[];
+  deliveryProofs?: DeliveryProof[];
+  returns?: ReturnRequest[];
+  invoices?: Invoice[];
+  supportTickets?: SupportTicket[];
+  communicationLogs?: CommunicationLog[];
+  analyticsReport?: AnalyticsReport;
 }
 
 export interface AuditLog {

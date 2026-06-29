@@ -4,6 +4,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Ecommerce Storefront",
   description: "Reusable ecommerce frontend for a Laravel REST API backend.",
+  openGraph: {
+    title: "Ecommerce Storefront",
+    description: "Reusable ecommerce frontend for a Laravel REST API backend.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ecommerce Storefront",
+    description: "Reusable ecommerce frontend for a Laravel REST API backend.",
+  },
 };
 
 export default function RootLayout({

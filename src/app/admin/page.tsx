@@ -46,7 +46,7 @@ import { useAdmin, type AdminSection } from "@/hooks/useAdmin";
 import { cn, formatCurrency, getPrimaryImage } from "@/lib/utils";
 import { adminService } from "@/services/adminService";
 import { authService } from "@/services/authService";
-import type { Branch, Coupon, Order, Payment, StaffUser, StoreSettings } from "@/types/admin";
+import type { AnalyticsReport, Branch, CommunicationLog, Coupon, DeliveryProof, DeliveryZone, Invoice, Order, Payment, ReturnRequest, StaffUser, StoreSettings, SupportTicket } from "@/types/admin";
 import type { Category } from "@/types/category";
 import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductColor, ProductQuestion, ProductVariant, SizeGuide } from "@/types/product";
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
@@ -504,12 +504,36 @@ export function AdminShell({ initialTab }: { initialTab: Tab }) {
                 <ShippingPanel methods={data.shippingMethods || []} busy={busy} run={run} />
               )}
 
+              {tab === "delivery" && (
+                <DeliveryPanel zones={data.deliveryZones || []} proofs={data.deliveryProofs || []} orders={data.orders} busy={busy} run={run} />
+              )}
+
+              {tab === "returns" && (
+                <ReturnsPanel returns={data.returns || []} busy={busy} run={run} />
+              )}
+
+              {tab === "invoices" && (
+                <InvoicesPanel invoices={data.invoices || []} orders={data.orders} />
+              )}
+
               {tab === "marketing" && (
                 <MarketingPanel banners={data.marketingBanners || []} busy={busy} run={run} />
               )}
 
               {tab === "newsletter" && (
                 <NewsletterPanel subscribers={data.newsletterSubscribers || []} busy={busy} run={run} />
+              )}
+
+              {tab === "communications" && (
+                <CommunicationsPanel store={data.store} logs={data.communicationLogs || []} busy={busy} run={run} />
+              )}
+
+              {tab === "support" && (
+                <SupportPanel tickets={data.supportTickets || []} busy={busy} run={run} />
+              )}
+
+              {tab === "analytics" && (
+                <AnalyticsPanel report={data.analyticsReport} salesReport={data.salesReport} />
               )}
 
               {tab === "inventory" && (
@@ -1790,6 +1814,127 @@ function ShippingPanel({ methods, busy, run }: { methods: ShippingMethod[]; busy
   );
 }
 
+function DeliveryPanel({ zones, proofs, orders, busy, run }: { zones: DeliveryZone[]; proofs: DeliveryProof[]; orders: Order[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const [draft, setDraft] = useState({ id: 0, name: "", city: "", postal_code: "", fee: "0", estimated_days: "2", sort_order: "0", is_active: true });
+  const [open, setOpen] = useState(false);
+  const editing = Boolean(draft.id);
+
+  function edit(zone: DeliveryZone) {
+    setDraft({
+      id: zone.id,
+      name: zone.name,
+      city: zone.city || "",
+      postal_code: zone.postal_code || "",
+      fee: String(zone.fee || 0),
+      estimated_days: String(zone.estimated_days || 0),
+      sort_order: String(zone.sort_order || 0),
+      is_active: zone.is_active,
+    });
+    setOpen(true);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const payload = { ...draft, fee: Number(draft.fee), estimated_days: Number(draft.estimated_days || 0), sort_order: Number(draft.sort_order || 0) };
+    await run(() => editing ? adminService.updateDeliveryZone(draft.id, payload) : adminService.createDeliveryZone(payload), editing ? "Delivery zone updated." : "Delivery zone created.");
+    setOpen(false);
+    setDraft({ id: 0, name: "", city: "", postal_code: "", fee: "0", estimated_days: "2", sort_order: "0", is_active: true });
+  }
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard label="Zones" value={zones.length} helper="City and fee rules" />
+        <MetricCard label="Proofs" value={proofs.length} helper="Delivery evidence records" />
+        <MetricCard label="In delivery" value={orders.filter((order) => ["processing", "shipped"].includes(order.status)).length} helper="Active fulfillment orders" />
+      </div>
+      <AdminCard>
+        <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <PanelTitle title="Delivery zones" subtitle="Set delivery fee rules by city, zone, or postal code." />
+          <Button onClick={() => { setDraft({ id: 0, name: "", city: "", postal_code: "", fee: "0", estimated_days: "2", sort_order: "0", is_active: true }); setOpen(true); }}>Add zone</Button>
+        </div>
+        <Drawer open={open} title={editing ? "Edit delivery zone" : "Add delivery zone"} subtitle="These rules can be used by checkout and delivery assignment later." onClose={() => setOpen(false)}>
+          <form onSubmit={submit} className="grid gap-3">
+            <Input required placeholder="Zone name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <Input placeholder="City" value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} />
+            <Input placeholder="Postal code" value={draft.postal_code} onChange={(e) => setDraft({ ...draft, postal_code: e.target.value })} />
+            <div className="grid gap-3 md:grid-cols-3">
+              <Input required type="number" placeholder="Fee" value={draft.fee} onChange={(e) => setDraft({ ...draft, fee: e.target.value })} />
+              <Input type="number" placeholder="Estimated days" value={draft.estimated_days} onChange={(e) => setDraft({ ...draft, estimated_days: e.target.value })} />
+              <Input type="number" placeholder="Sort order" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: e.target.value })} />
+            </div>
+            <label className="flex h-11 items-center gap-2 rounded-full border border-neutral-200 px-4 text-sm"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} /> Active</label>
+            <div className="flex gap-2"><Button disabled={busy}>{editing ? "Update zone" : "Create zone"}</Button><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button></div>
+          </form>
+        </Drawer>
+        <AdminTable columns={["Zone", "City", "Postcode", "Fee", "ETA", "Status", "Date", "Actions"]} rows={zones.map((zone) => [
+          zone.name,
+          zone.city || "-",
+          zone.postal_code || "-",
+          formatCurrency(Number(zone.fee || 0)),
+          zone.estimated_days ? `${zone.estimated_days} days` : "-",
+          <StatusBadge key="status" status={zone.is_active ? "active" : "inactive"} />,
+          <DateCell key="date" value={zone.created_at} />,
+          <ActionButtons key="actions" busy={busy} onEdit={() => edit(zone)} onDelete={() => run(() => adminService.deleteDeliveryZone(zone.id), "Delivery zone deleted.")} />,
+        ])} />
+      </AdminCard>
+      <AdminCard>
+        <PanelTitle title="Delivery proof timeline" subtitle="Proof records for delivered or failed delivery attempts." />
+        <AdminTable columns={["Order", "Status", "Recipient", "Note", "Delivered", "Date"]} rows={proofs.map((proof) => [
+          proof.order?.order_number || "-",
+          <StatusBadge key="status" status={proof.status} />,
+          proof.recipient_name || "-",
+          proof.note || "-",
+          <DateCell key="delivered" value={proof.delivered_at} />,
+          <DateCell key="date" value={proof.created_at} />,
+        ])} />
+      </AdminCard>
+    </div>
+  );
+}
+
+function ReturnsPanel({ returns, busy, run }: { returns: ReturnRequest[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const returnStatusOptions = ["pending", "approved", "rejected", "received", "refunded", "exchanged"].map((value) => ({ label: titleCase(value), value }));
+
+  return (
+    <AdminCard>
+      <PanelTitle title="Returns and exchanges" subtitle="Approve, reject, receive, refund, or mark exchanges from one workflow." />
+      <AdminTable columns={["Request", "Order", "Type", "Reason", "Refund", "Status", "Date", "Actions"]} rows={returns.map((item) => [
+        item.request_number,
+        item.order?.order_number || "-",
+        titleCase(item.type),
+        item.reason,
+        formatCurrency(Number(item.refund_amount || 0)),
+        <StatusBadge key="status" status={item.status} />,
+        <DateCell key="date" value={item.created_at} />,
+        <Dropdown key="actions" size="sm" disabled={busy} value={item.status} options={returnStatusOptions} onChange={(status) => run(() => adminService.updateReturn(item.id, { status, refund_amount: item.refund_amount || 0 }), "Return updated.")} />,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function InvoicesPanel({ invoices, orders }: { invoices: Invoice[]; orders: Order[] }) {
+  return (
+    <AdminCard>
+      <PanelTitle title="Invoices" subtitle="Accounting-ready invoice records with printable order sheets." />
+      <AdminTable columns={["Invoice", "Order", "Subtotal", "Tax", "Delivery", "Total", "Status", "Date", "Actions"]} rows={invoices.map((invoice) => {
+        const order = orders.find((item) => item.id === invoice.order?.id);
+        return [
+          invoice.invoice_number,
+          invoice.order?.order_number || "-",
+          formatCurrency(Number(invoice.subtotal || 0)),
+          formatCurrency(Number(invoice.tax_total || 0)),
+          formatCurrency(Number(invoice.delivery_fee || 0)),
+          formatCurrency(Number(invoice.total || 0)),
+          <StatusBadge key="status" status={invoice.status} />,
+          <DateCell key="date" value={invoice.issued_at || invoice.created_at} />,
+          order ? <Button key="print" className="h-8 px-3" variant="outline" onClick={() => printInvoice(order)}>Print</Button> : "-",
+        ];
+      })} />
+    </AdminCard>
+  );
+}
+
 function MarketingPanel({ banners, busy, run }: { banners: MarketingBanner[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
   const [draft, setDraft] = useState<BannerDraft>(emptyBanner);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -1906,6 +2051,134 @@ function NewsletterPanel({ subscribers, busy, run }: { subscribers: NewsletterSu
         </div>,
       ])} />
     </AdminCard>
+  );
+}
+
+function CommunicationsPanel({ store, logs, busy, run }: { store?: StoreSettings; logs: CommunicationLog[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const settings = store?.settings || {};
+  const [draft, setDraft] = useState({
+    channels: ((settings.communication as { enabled_channels?: string[] } | undefined)?.enabled_channels || ["email"]).join(", "),
+    emailProvider: ((settings.integrations as Record<string, { provider?: string }> | undefined)?.email?.provider || "mail_log"),
+    emailKey: "",
+    smsProvider: ((settings.integrations as Record<string, { provider?: string }> | undefined)?.sms?.provider || ""),
+    smsKey: "",
+    whatsappProvider: ((settings.integrations as Record<string, { provider?: string }> | undefined)?.whatsapp?.provider || ""),
+    whatsappKey: "",
+    whatsappWebhook: ((settings.integrations as Record<string, { webhook_url?: string }> | undefined)?.whatsapp?.webhook_url || ""),
+    taxName: ((settings.tax as { name?: string } | undefined)?.name || "VAT"),
+    taxRate: String((settings.tax as { rate?: number } | undefined)?.rate || 0),
+    taxNumber: ((settings.tax as { tax_number?: string } | undefined)?.tax_number || ""),
+    courierProvider: ((settings.courier as { provider?: string } | undefined)?.provider || ""),
+    courierKey: "",
+    courierTracking: ((settings.courier as { tracking_url_template?: string } | undefined)?.tracking_url_template || ""),
+  });
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await run(() => adminService.updateCommunicationSettings({
+      communication: { enabled_channels: draft.channels.split(",").map((value) => value.trim()).filter(Boolean) },
+      integrations: {
+        email: { provider: draft.emailProvider, api_key: draft.emailKey || null },
+        sms: { provider: draft.smsProvider || null, api_key: draft.smsKey || null },
+        whatsapp: { provider: draft.whatsappProvider || null, api_key: draft.whatsappKey || null, webhook_url: draft.whatsappWebhook || null },
+      },
+      tax: { name: draft.taxName, rate: Number(draft.taxRate || 0), tax_number: draft.taxNumber || null },
+      courier: { provider: draft.courierProvider || null, api_key: draft.courierKey || null, tracking_url_template: draft.courierTracking || null },
+    }), "Communication settings saved.");
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
+      <AdminCard>
+        <PanelTitle title="Integration settings" subtitle="Keep provider names and API keys here when the client chooses email, SMS, WhatsApp, or courier services." />
+        <form onSubmit={submit} className="mt-5 grid gap-3">
+          <Input placeholder="Enabled channels: email, sms, whatsapp" value={draft.channels} onChange={(e) => setDraft({ ...draft, channels: e.target.value })} />
+          <Input placeholder="Email provider" value={draft.emailProvider} onChange={(e) => setDraft({ ...draft, emailProvider: e.target.value })} />
+          <Input placeholder="Email API key placeholder" value={draft.emailKey} onChange={(e) => setDraft({ ...draft, emailKey: e.target.value })} />
+          <Input placeholder="SMS provider" value={draft.smsProvider} onChange={(e) => setDraft({ ...draft, smsProvider: e.target.value })} />
+          <Input placeholder="SMS API key placeholder" value={draft.smsKey} onChange={(e) => setDraft({ ...draft, smsKey: e.target.value })} />
+          <Input placeholder="WhatsApp provider" value={draft.whatsappProvider} onChange={(e) => setDraft({ ...draft, whatsappProvider: e.target.value })} />
+          <Input placeholder="WhatsApp webhook URL" value={draft.whatsappWebhook} onChange={(e) => setDraft({ ...draft, whatsappWebhook: e.target.value })} />
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input placeholder="Tax name" value={draft.taxName} onChange={(e) => setDraft({ ...draft, taxName: e.target.value })} />
+            <Input type="number" placeholder="Tax rate" value={draft.taxRate} onChange={(e) => setDraft({ ...draft, taxRate: e.target.value })} />
+            <Input placeholder="Tax number" value={draft.taxNumber} onChange={(e) => setDraft({ ...draft, taxNumber: e.target.value })} />
+          </div>
+          <Input placeholder="Courier provider" value={draft.courierProvider} onChange={(e) => setDraft({ ...draft, courierProvider: e.target.value })} />
+          <Input placeholder="Courier API key placeholder" value={draft.courierKey} onChange={(e) => setDraft({ ...draft, courierKey: e.target.value })} />
+          <Input placeholder="Tracking URL template" value={draft.courierTracking} onChange={(e) => setDraft({ ...draft, courierTracking: e.target.value })} />
+          <Button disabled={busy}>Save settings</Button>
+        </form>
+      </AdminCard>
+      <AdminCard>
+        <PanelTitle title="Notification logs" subtitle="Order confirmation, payment, shipped, delivered, admin alerts, and low-stock notifications are logged here." />
+        <AdminTable columns={["Channel", "Event", "Recipient", "Subject", "Status", "Date"]} rows={logs.map((log) => [
+          log.channel,
+          titleCase(log.event),
+          log.recipient || "-",
+          log.subject || "-",
+          <StatusBadge key="status" status={log.status} />,
+          <DateCell key="date" value={log.created_at} />,
+        ])} />
+      </AdminCard>
+    </div>
+  );
+}
+
+function SupportPanel({ tickets, busy, run }: { tickets: SupportTicket[]; busy: boolean; run: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const statusOptions = ["open", "pending", "closed"].map((value) => ({ label: titleCase(value), value }));
+  const priorityOptions = ["low", "normal", "high", "urgent"].map((value) => ({ label: titleCase(value), value }));
+
+  return (
+    <AdminCard>
+      <PanelTitle title="Customer support" subtitle="Track customer support tickets alongside orders." />
+      <AdminTable columns={["Ticket", "Customer", "Subject", "Priority", "Status", "Messages", "Date", "Actions"]} rows={tickets.map((ticket) => [
+        ticket.ticket_number,
+        <span key="customer"><strong>{ticket.customer_name}</strong><br /><small className="text-neutral-500">{ticket.customer_email || ticket.customer_phone || "-"}</small></span>,
+        ticket.subject,
+        <StatusBadge key="priority" status={ticket.priority} />,
+        <StatusBadge key="status" status={ticket.status} />,
+        ticket.messages?.length || 0,
+        <DateCell key="date" value={ticket.created_at} />,
+        <div key="actions" className="flex flex-wrap gap-2">
+          <Dropdown size="sm" disabled={busy} value={ticket.status} options={statusOptions} onChange={(status) => run(() => adminService.updateSupportTicket(ticket.id, { status, priority: ticket.priority }), "Ticket updated.")} />
+          <Dropdown size="sm" disabled={busy} value={ticket.priority} options={priorityOptions} onChange={(priority) => run(() => adminService.updateSupportTicket(ticket.id, { status: ticket.status, priority }), "Ticket priority updated.")} />
+        </div>,
+      ])} />
+    </AdminCard>
+  );
+}
+
+function AnalyticsPanel({ report, salesReport }: { report?: AnalyticsReport; salesReport?: ReturnType<typeof useAdmin>["data"]["salesReport"] }) {
+  const channelRows = (report?.revenue_by_channel || []).map((item) => ({ label: item.channel, revenue: Number(item.revenue || 0) }));
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-4">
+        <MetricCard label="Conversion" value={`${report?.conversion_rate || 0}%`} helper="Orders per tracked session" />
+        <MetricCard label="Cart abandonment" value={`${report?.cart_abandonment_rate || 0}%`} helper="Cart adds without completed order" />
+        <MetricCard label="AOV" value={formatCurrency(report?.average_order_value || 0)} helper="Average order value" />
+        <MetricCard label="Repeat customers" value={report?.repeat_customers || 0} helper="Customers with multiple orders" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <AdminCard>
+          <PanelTitle title="Revenue by channel" subtitle="Source attribution from order metadata." />
+          <BestSellerChart rows={channelRows.map((row) => ({ label: row.label, quantity: 1, revenue: row.revenue }))} />
+        </AdminCard>
+        <AdminCard>
+          <PanelTitle title="Sales by date" subtitle="Report data remains exportable from the top toolbar." />
+          <SalesAreaChart rows={(salesReport?.sales_by_date || []).map((row) => ({ label: row.date, revenue: Number(row.revenue), orders: Number(row.orders) }))} />
+        </AdminCard>
+      </div>
+      <AdminCard>
+        <AdminTable columns={["Metric", "Value"]} rows={[
+          ["Sessions", report?.sessions || 0],
+          ["Product views", report?.product_views || 0],
+          ["Cart adds", report?.cart_adds || 0],
+          ["Checkout starts", report?.checkout_starts || 0],
+          ["Customer lifetime value", formatCurrency(report?.customer_lifetime_value || 0)],
+        ]} />
+      </AdminCard>
+    </div>
   );
 }
 
@@ -2928,8 +3201,14 @@ function getExportRows(tab: Tab, data: ReturnType<typeof useAdmin>["data"]) {
     reports: data.salesReport?.best_selling_products || [],
     payments: data.payments,
     shipping: data.shippingMethods || [],
+    delivery: [...(data.deliveryZones || []), ...(data.deliveryProofs || [])],
+    returns: data.returns || [],
+    invoices: data.invoices || [],
     marketing: data.marketingBanners || [],
     newsletter: data.newsletterSubscribers || [],
+    communications: data.communicationLogs || [],
+    support: data.supportTickets || [],
+    analytics: data.analyticsReport ? [data.analyticsReport] : [],
     inventory: data.inventoryLogs,
     branches: data.branches,
     staff: data.staff,

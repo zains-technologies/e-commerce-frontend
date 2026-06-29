@@ -8,6 +8,7 @@ import { OrderSummary } from "@/components/cart/OrderSummary";
 import { Shell } from "@/components/layout/Shell";
 import { useCart } from "@/hooks/useCart";
 import { marketingService } from "@/services/marketingService";
+import { analyticsService } from "@/services/analyticsService";
 import { orderService } from "@/services/orderService";
 import { paymentService } from "@/services/paymentService";
 import type { CheckoutPayload } from "@/types/cart";
@@ -50,6 +51,12 @@ export default function CheckoutPage() {
       })
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!loading && cart.items.length > 0) {
+      void analyticsService.track({ event: "checkout_started", payload: { items: cart.items.length, total: cart.totals.total } });
+    }
+  }, [cart.items.length, cart.totals.total, loading]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

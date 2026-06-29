@@ -77,6 +77,27 @@
     "description": "Delivery methods and customer checkout fees."
   },
   {
+    "key": "delivery",
+    "name": "Delivery",
+    "path": "/admin/delivery",
+    "icon": "Truck",
+    "description": "Delivery zones, proof of delivery, failed delivery, and courier setup."
+  },
+  {
+    "key": "returns",
+    "name": "Returns",
+    "path": "/admin/returns",
+    "icon": "ShoppingBag",
+    "description": "Return, exchange, approval, rejection, and refund workflow."
+  },
+  {
+    "key": "invoices",
+    "name": "Invoices",
+    "path": "/admin/invoices",
+    "icon": "CreditCard",
+    "description": "Invoice sequence, credit notes, tax records, and printable accounting sheets."
+  },
+  {
     "key": "marketing",
     "name": "Marketing",
     "path": "/admin/marketing",
@@ -89,6 +110,27 @@
     "path": "/admin/newsletter",
     "icon": "Mail",
     "description": "Newsletter subscribers and subscription health."
+  },
+  {
+    "key": "communications",
+    "name": "Communications",
+    "path": "/admin/communications",
+    "icon": "Mail",
+    "description": "Email, SMS, WhatsApp, and notification integration settings."
+  },
+  {
+    "key": "support",
+    "name": "Support",
+    "path": "/admin/support",
+    "icon": "MessageSquare",
+    "description": "Customer support tickets and post-purchase communication."
+  },
+  {
+    "key": "analytics",
+    "name": "Analytics",
+    "path": "/admin/analytics",
+    "icon": "ChartNoAxesCombined",
+    "description": "Conversion, cart abandonment, repeat customers, AOV, and revenue channels."
   },
   {
     "key": "inventory",

@@ -11,6 +11,7 @@ import { ProductGrid } from "@/components/product/ProductGrid";
 import { useCart } from "@/hooks/useCart";
 import { useProducts } from "@/hooks/useProducts";
 import { formatCurrency, getPrimaryImage } from "@/lib/utils";
+import { analyticsService } from "@/services/analyticsService";
 import { productService } from "@/services/productService";
 import type { Product, ProductColor, ProductVariant } from "@/types/product";
 
@@ -56,6 +57,7 @@ export default function ProductDetailPage() {
             data.variants?.[0] ||
             null,
         );
+        void analyticsService.track({ event: "product_view", product_id: data.id, payload: { slug: data.slug } });
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));

@@ -6,7 +6,7 @@ import { authService } from "@/services/authService";
 import type { AdminDashboardData } from "@/types/admin";
 import type { User } from "@/types/user";
 
-export type AdminSection = "overview" | "store" | "products" | "categories" | "orders" | "coupons" | "reviews" | "questions" | "reports" | "payments" | "shipping" | "marketing" | "newsletter" | "inventory" | "branches" | "staff" | "audit";
+export type AdminSection = "overview" | "store" | "products" | "categories" | "orders" | "coupons" | "reviews" | "questions" | "reports" | "payments" | "shipping" | "marketing" | "newsletter" | "inventory" | "delivery" | "returns" | "invoices" | "support" | "communications" | "analytics" | "branches" | "staff" | "audit";
 
 const emptyData: AdminDashboardData = {
   products: [],
@@ -29,6 +29,14 @@ const emptyData: AdminDashboardData = {
   newsletterSubscribers: [],
   questions: [],
   auditLogs: [],
+  paymentLogs: [],
+  paymentEvidences: [],
+  deliveryZones: [],
+  deliveryProofs: [],
+  returns: [],
+  invoices: [],
+  supportTickets: [],
+  communicationLogs: [],
 };
 
 let cachedAdminUser: User | null = null;
@@ -110,13 +118,67 @@ export function useAdmin(section: AdminSection = "overview") {
       }
 
       if (section === "payments") {
-        const payments = await adminService.payments().catch(() => []);
+        const [payments, paymentLogs, paymentEvidences] = await Promise.all([
+          adminService.payments().catch(() => []),
+          adminService.paymentLogs().catch(() => []),
+          adminService.paymentEvidences().catch(() => []),
+        ]);
         nextData.payments = payments;
+        nextData.paymentLogs = paymentLogs;
+        nextData.paymentEvidences = paymentEvidences;
         loadedPayments = payments;
       }
 
       if (section === "shipping") {
         nextData.shippingMethods = await adminService.shippingMethods().catch(() => []);
+      }
+
+      if (section === "delivery") {
+        const [deliveryZones, deliveryProofs, orders] = await Promise.all([
+          adminService.deliveryZones().catch(() => []),
+          adminService.deliveryProofs().catch(() => []),
+          adminService.orders().catch(() => []),
+        ]);
+        Object.assign(nextData, { deliveryZones, deliveryProofs, orders });
+        loadedOrders = orders;
+      }
+
+      if (section === "returns") {
+        const [returns, orders] = await Promise.all([
+          adminService.returns().catch(() => []),
+          adminService.orders().catch(() => []),
+        ]);
+        Object.assign(nextData, { returns, orders });
+        loadedOrders = orders;
+      }
+
+      if (section === "invoices") {
+        const [invoices, orders] = await Promise.all([
+          adminService.invoices().catch(() => []),
+          adminService.orders().catch(() => []),
+        ]);
+        Object.assign(nextData, { invoices, orders });
+        loadedOrders = orders;
+      }
+
+      if (section === "support") {
+        nextData.supportTickets = await adminService.supportTickets().catch(() => []);
+      }
+
+      if (section === "communications") {
+        const [communicationLogs, store] = await Promise.all([
+          adminService.communicationLogs().catch(() => []),
+          adminService.store().catch(() => undefined),
+        ]);
+        Object.assign(nextData, { communicationLogs, store });
+      }
+
+      if (section === "analytics") {
+        const [analyticsReport, salesReport] = await Promise.all([
+          adminService.analyticsReport().catch(() => undefined),
+          adminService.salesReport().catch(() => undefined),
+        ]);
+        Object.assign(nextData, { analyticsReport, salesReport });
       }
 
       if (section === "marketing") {

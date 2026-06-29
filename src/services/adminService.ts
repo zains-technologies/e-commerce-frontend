@@ -5,15 +5,24 @@ import type { Category } from "@/types/category";
 import type { CatalogBrand, CatalogTag, Product, ProductCollection, ProductColor, SizeGuide } from "@/types/product";
 import type {
   Branch,
+  AnalyticsReport,
+  CommunicationLog,
   Coupon,
+  DeliveryProof,
+  DeliveryZone,
   AuditLog,
+  Invoice,
   InventoryLog,
   Order,
   Payment,
+  PaymentEvidence,
+  PaymentLog,
   ProfitReport,
+  ReturnRequest,
   SalesReport,
   StaffUser,
   StoreSettings,
+  SupportTicket,
 } from "@/types/admin";
 import type { MarketingBanner, NewsletterSubscriber, ShippingMethod } from "@/types/marketing";
 
@@ -63,7 +72,16 @@ export const adminService = {
   orders: () => apiRequest<PaginatedResponse<Order>>(API_ROUTES.ORDERS, { auth: true }).then((r) => r.data),
   coupons: () => apiRequest<PaginatedResponse<Coupon>>(API_ROUTES.ADMIN_COUPONS, { auth: true }).then((r) => r.data),
   payments: () => apiRequest<PaginatedResponse<Payment>>(API_ROUTES.ADMIN_PAYMENTS, { auth: true }).then((r) => r.data),
+  paymentLogs: () => apiRequest<SingleResponse<PaginatedResponse<PaymentLog>>>(API_ROUTES.ADMIN_PAYMENT_LOGS, { auth: true }).then((r) => r.data.data),
+  paymentEvidences: () => apiRequest<SingleResponse<PaginatedResponse<PaymentEvidence>>>(API_ROUTES.ADMIN_PAYMENT_EVIDENCES, { auth: true }).then((r) => r.data.data),
   inventoryLogs: () => apiRequest<PaginatedResponse<InventoryLog>>(API_ROUTES.ADMIN_INVENTORY_LOGS, { auth: true }).then((r) => r.data),
+  deliveryZones: () => apiRequest<SingleResponse<DeliveryZone[]>>(API_ROUTES.ADMIN_DELIVERY_ZONES, { auth: true }).then((r) => r.data),
+  deliveryProofs: () => apiRequest<SingleResponse<PaginatedResponse<DeliveryProof>>>(API_ROUTES.ADMIN_DELIVERY_PROOFS, { auth: true }).then((r) => r.data.data),
+  returns: () => apiRequest<SingleResponse<PaginatedResponse<ReturnRequest>>>(API_ROUTES.ADMIN_RETURNS, { auth: true }).then((r) => r.data.data),
+  invoices: () => apiRequest<SingleResponse<PaginatedResponse<Invoice>>>(API_ROUTES.ADMIN_INVOICES, { auth: true }).then((r) => r.data.data),
+  supportTickets: () => apiRequest<SingleResponse<PaginatedResponse<SupportTicket>>>(API_ROUTES.ADMIN_SUPPORT_TICKETS, { auth: true }).then((r) => r.data.data),
+  communicationLogs: () => apiRequest<SingleResponse<PaginatedResponse<CommunicationLog>>>(API_ROUTES.ADMIN_COMMUNICATION_LOGS, { auth: true }).then((r) => r.data.data),
+  analyticsReport: () => apiRequest<SingleResponse<AnalyticsReport>>(API_ROUTES.ADMIN_ANALYTICS_REPORT, { auth: true }).then((r) => r.data),
   notifications: () => apiRequest<SingleResponse<Array<{ type: string; title: string; message: string; target: string }>>>(API_ROUTES.ADMIN_NOTIFICATIONS, { auth: true }).then((r) => r.data),
   shippingMethods: () => apiRequest<SingleResponse<ShippingMethod[]>>(API_ROUTES.ADMIN_SHIPPING_METHODS, { auth: true }).then((r) => r.data),
   marketingBanners: () => apiRequest<SingleResponse<MarketingBanner[]>>(API_ROUTES.ADMIN_BANNERS, { auth: true }).then((r) => r.data),
@@ -85,6 +103,14 @@ export const adminService = {
         payload.append("_method", "PUT");
         return payload;
       })() : bodyFor(payload),
+    }).then((r) => r.data);
+  },
+
+  updateCommunicationSettings(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<StoreSettings>>(API_ROUTES.ADMIN_COMMUNICATION_SETTINGS, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
     }).then((r) => r.data);
   },
 
@@ -358,6 +384,57 @@ export const adminService = {
       auth: true,
       body: JSON.stringify(payload),
     }).then((r) => r.data);
+  },
+
+  updatePaymentEvidence(evidenceId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<PaymentEvidence>>(`${API_ROUTES.ADMIN_PAYMENT_EVIDENCES}/${evidenceId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  createDeliveryZone(payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<DeliveryZone>>(API_ROUTES.ADMIN_DELIVERY_ZONES, {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  updateDeliveryZone(zoneId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<DeliveryZone>>(`${API_ROUTES.ADMIN_DELIVERY_ZONES}/${zoneId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  deleteDeliveryZone(zoneId: number) {
+    return apiRequest<{ success: boolean; message: string }>(`${API_ROUTES.ADMIN_DELIVERY_ZONES}/${zoneId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  },
+
+  updateReturn(returnId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<ReturnRequest>>(`${API_ROUTES.ADMIN_RETURNS}/${returnId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  updateSupportTicket(ticketId: number, payload: Record<string, unknown>) {
+    return apiRequest<SingleResponse<SupportTicket>>(`${API_ROUTES.ADMIN_SUPPORT_TICKETS}/${ticketId}`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify(payload),
+    }).then((r) => r.data);
+  },
+
+  invoicePrintUrl(orderId: number) {
+    return `${API_BASE_URL}/orders/${orderId}/invoice/print`;
   },
 
   createShippingMethod(payload: Record<string, unknown>) {

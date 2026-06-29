@@ -1,5 +1,6 @@
 import { API_ROUTES } from "@/constants/apiRoutes";
 import { apiRequest, type SingleResponse } from "./api";
+import { analyticsService } from "./analyticsService";
 import type { AddToCartPayload, Cart } from "@/types/cart";
 
 export const emptyCart: Cart = {
@@ -24,6 +25,7 @@ export const cartService = {
       body: JSON.stringify(payload),
       cart: true,
     });
+    void analyticsService.track({ event: "cart_add", product_id: payload.product_id, payload: { quantity: payload.quantity, variant_id: payload.product_variant_id } });
     return response.data;
   },
 
